@@ -1,0 +1,18 @@
+import React from 'react';
+import { Redirect, Route, RouteProps } from 'react-router';
+import { useStoreState } from '@/state/hooks';
+
+export default ({ children, ...props }: Omit<RouteProps, 'render'>) => {
+  const isAuthenticated = useStoreState((state) => !!state.user.data?.uuid);
+  const isCloud = useStoreState((state) => !!state.user.data?.cloud);
+
+  return (
+    <Route
+      {...props}
+      render={({ location }) =>
+        isAuthenticated && isCloud ? children : <Redirect to={{ pathname: '/', state: { from: location } }} />
+      }
+    />
+  );
+};
+

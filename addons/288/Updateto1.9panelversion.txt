@@ -1,0 +1,22 @@
+FOR PANEL ABOVE 1.9 VERSION :
+
+In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/importer',
+            permission: 'serverimporter.*',
+            name: 'Server Importer",
+            component: ImporterContainer,
+        },

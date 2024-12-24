@@ -1,0 +1,326 @@
+Hey Bagou450 Thanks for your purchase
+First upload the content of panel files folder to your pterodactyl folder
+
+
+1 - In app/Http/Controllers/Api/Client/Servers/FileController.php after all use line add :
+
+use Illuminate\Http\Request;
+
+2 - In same file above last } add :
+
+     /**
+     * Get file size of requested file 
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function fileSize(Request $request, Server $server): int
+    {
+        $contents = $this->fileRepository
+            ->setServer($server)
+            ->FileSize($request->input('url'));
+        return $contents;
+    }
+    /**
+     * Get downloaded size 
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function downloadedSize(Request $request, Server $server): int
+    {
+        $contents = $this->fileRepository
+            ->setServer($server)
+            ->DownloadedSize($request->input('path'));
+        return $contents;
+    }
+
+3 - In app/Repositories/Wings/DeamonFileRepository.php above last } add :
+
+            /**
+     * Return requested file size
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function FileSize(string $url): int
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+        try {
+            $response =  $this->getHttpClient()->post(
+                sprintf('/api/servers/%s/files/getFileSize', $this->server->uuid),
+                [
+                    'json' => [
+                        'url' => $url
+                    ],
+                ]
+            );
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+        return json_decode($response->getBody(), true);
+
+    }
+
+
+    /**
+     * Return downloaded size
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function DownloadedSize(string $path): int
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+        try {
+            $response = $this->getHttpClient()->post(
+                sprintf('/api/servers/%s/files/getDownloadState', $this->server->uuid),
+                [
+                    'json' => [
+                        'path' => $path,
+                    ],
+                ]
+            );
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+
+        return json_decode($response->getBody(), true);
+
+    }
+4 - In resources/views/layouts/admin.blade.php above " <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.api') ?: 'active' }}">" add :
+
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.minecrafttemplate') ?: 'active' }}">
+                            <a href="{{ route('admin.minecrafttemplate')}}">
+                                <i class="fa fa-arrow-circle-o-down"></i> <span>Minecraft template</span>
+                            </a>
+                        </li>
+STEP 5 6 7 FOR < 1.8 PANEL VERSION:             
+5 - In routes/admin.php at the end of file add :
+
+/*
+|--------------------------------------------------------------------------
+| Minecraft template Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/minecrafttemplate
+|
+*/
+Route::group(['prefix' => 'minecrafttemplate'], function () {
+    Route::get('/', 'MinecrafttemplateController@index')->name('admin.minecrafttemplate');
+    Route::get('/new', 'MinecrafttemplateController@new')->name('admin.minecrafttemplate.new');
+    Route::get('/edit/{id}', 'MinecrafttemplateController@edit')->name('admin.minecrafttemplate.edit');
+
+    Route::post('/settings', 'MinecrafttemplateController@settings')->name('admin.minecrafttemplate.settings');
+    Route::post('/create', 'MinecrafttemplateController@create')->name('admin.minecrafttemplate.create');
+    Route::post('/update/{id}', 'MinecrafttemplateController@update')->name('admin.minecrafttemplate.update');
+
+    Route::delete('/delete', 'MinecrafttemplateController@delete')->name('admin.minecrafttemplate.delete');
+}); 
+
+
+6 - In routes/api-client.php above "Route::group(['prefix' => '/account'], function () {" add :
+
+Route::get('/minecrafttemplate', 'ClientController@minecrafttemplate');
+
+7 - In same file after "Route::post('/chmod', 'Servers\FileController@chmod');" add :
+
+        Route::post('/downloadedSize', 'Servers\FileController@downloadedSize');
+        Route::post('/fileSize', 'Servers\FileController@fileSize');
+
+STEP 5 6 7 FOR >= 1.8 PANEL VERSION:
+
+5 - In routes/admin.php at the end of file add :
+
+/*
+|--------------------------------------------------------------------------
+| Minecraft template Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/minecrafttemplate
+|
+*/
+Route::group(['prefix' => 'minecrafttemplate'], function () {
+    Route::get('/', [Admin\MinecrafttemplateController::class, 'index'])->name('admin.minecrafttemplate');
+    Route::get('/new', [Admin\MinecrafttemplateController::class, 'new'])->name('admin.minecrafttemplate.new');
+    Route::get('/edit/{id}', [Admin\MinecrafttemplateController::class, 'edit'])->name('admin.minecrafttemplate.edit');
+
+    Route::post('/settings', [Admin\MinecrafttemplateController::class, 'settings'])->name('admin.minecrafttemplate.settings');
+    Route::post('/create', [Admin\MinecrafttemplateController::class, 'create'])->name('admin.minecrafttemplate.create');
+    Route::post('/update/{id}', [Admin\MinecrafttemplateController::class, 'update'])->name('admin.minecrafttemplate.update');
+
+    Route::delete('/delete', [Admin\MinecrafttemplateController::class, 'delete'])->name('admin.minecrafttemplate.delete');
+}); 
+
+
+6 - In routes/api-client.php above "Route::group(['prefix' => '/account'], function () {" add :
+
+Route::get('/minecrafttemplate', [Client\ClientController::class, 'minecrafttemplate']);
+
+7 - In same file after "Route::post('/chmod',  [Client\Servers\FileController::class, 'chmod']);" add :
+
+        Route::post('/downloadedSize', [Client\Servers\FileController::class, 'downloadedSize']);
+        Route::post('/fileSize', [Client\Servers\FileController::class, 'fileSize']);
+        
+FOR PANEL UNDER 1.9 VERSION  
+8 - In resources/scripts/routers/ServerRouter.tsx after all import line add :
+
+import MinecraftTemplateContainer from '@/components/server/minecrafttemplate/MinecraftTemplateContainer';
+
+8.1 - In same file above "<Can action={'backup.*'}>" add :
+					{nestId === 1
+                                <Can action={'minecraftbase.*'}>
+                                    <NavLink to={`${match.url}/minecrafttemplate`}>Template</NavLink>
+                                </Can>
+					}
+
+8.2 - In same file above "<Route path={`${match.path}/backups`} exact>" add :
+						{nestId === 1
+                                        <Route path={`${match.path}/minecrafttemplate`} exact>
+                                            <RequireServerPermission permissions={'file.*'}>
+                                                <MinecraftTemplateContainer/>
+                                            </RequireServerPermission>
+                                        </Route>
+						}
+8.3 - In same file under "const clearServerState = ServerContext.useStoreActions(actions => actions.clearServerState);" add : 
+
+    const nestId = ServerContext.useStoreState(state => state.server.data?.nestId);
+
+FOR PANEL ABOVE 1.9 VERSION
+
+8 - In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/minecrafttemplate',
+            permission: 'file.*',
+            name: 'Template',
+            nestid: 1,
+            component: MinecraftTemplateContainer,
+        },
+ 
+8.1 - In same file after "permission: string | string[] | null;" add :
+
+                 nestid?: number;
+                 eggid?: number;
+
+8.2 - In resources/scripts/routers/routes.ts after "import ServerActivityLogContainer from '@/components/server/ServerActivityLogContainer';" add :
+
+import MinecraftTemplateContainer from '@/components/server/minecrafttemplate/MinecraftTemplateContainer';
+
+
+8.3 - In resources/scripts/routers/ServerRouter.ts after "import ConflictStateRenderer from '@/components/server/ConflictStateRenderer';" add :
+
+import { Navigation, ComponentLoader } from '@/routers/ServerElements';
+
+
+8.4 - In same file replace :
+
+"
+                               {routes.server
+                                    .filter((route) => !!route.name)
+                                    .map((route) =>
+                                        route.permission ? (
+                                            <Can key={route.path} action={route.permission} matchAny>
+                                                <NavLink to={to(route.path, true)} exact={route.exact}>
+                                                    {route.name}
+                                                </NavLink>
+                                            </Can>
+                                        ) : (
+                                            <NavLink key={route.path} to={to(route.path, true)} exact={route.exact}>
+                                                {route.name}
+                                            </NavLink>
+                                        )
+                                    )}
+"
+
+
+By:
+
+<Navigation />
+
+
+
+8.5 - In same file replace :
+
+"
+                               {routes.server.map(({ path, permission, component: Component }) => (
+                                        <PermissionRoute key={path} permission={permission} path={to(path)} exact>
+                                            <Spinner.Suspense>
+                                                <Component />
+                                            </Spinner.Suspense>
+                                        </PermissionRoute>
+                                    ))}
+"
+
+By :
+
+<ComponentLoader />
+
+
+9 - In app/Http/Controllers/Api/Client/ClientController.php after all use line add :
+
+use Illuminate\Support\Facades\DB;
+
+10 - In same file above last } add :
+
+        public function minecrafttemplate()
+        {
+            $minecrafttemplate = DB::table('minecrafttemplate')->get();
+
+            $minecrafttemplate = json_decode(json_encode($minecrafttemplate) , true);
+
+            return $minecrafttemplate;
+        }
+
+
+11 - In /app/Transformers/Api/Client/ServerTransformer.php bellow "'node' => $server->node->name," add :
+
+            'nest_id' => $server->nest_id,
+For panel above 1.9 add also this under "'name' => $server->name,": 
+
+
+        'egg_id' => $server->egg_id, 
+12 - In resources/scripts/api/server/getServer.ts under  "node: string;" add : 
+
+
+    nestId: number;
+
+For panel above 1.9 add also this under "node: string;": 
+
+    eggid: number;
+    
+and under "node: data.node," add :
+
+
+    nestId: data.nest_id,
+    
+For panel above 1.9 add also this under "status: data.status,": 
+
+    eggid: data.egg_id,
+    
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+php artisan migrate
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a sms to +33 7 56 89 00 36 (Unsurcharged number)
+

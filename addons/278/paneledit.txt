@@ -1,0 +1,241 @@
+Hey, thanks for your purchase.
+
+After you need to upload the content of panelfiles/fr or panelfiles/en (It depends on the desired language) folder
+
+Now go to change the panel files
+
+
+1 - In /app/Transformers/Api/Client/ServerTransformer.php bellow "'node' => $server->node->name," add :
+
+    'egg_id' => $server->egg_id,
+For panel above 1.9 add also this under "'name' => $server->name,":
+
+            'nest_id' => $server->nest_id,
+2 - In resources/scripts/api/server/getServer.ts under  "node: string;" add :
+
+    eggId: number;
+
+For panel above 1.9 add also this under "node: string;":
+
+    nestId: number;
+and under "node: data.node," add :
+
+    eggId: data.egg_id,
+For panel above 1.9 add also this under "status: data.status,":
+
+    nestId: data.nest_id,
+
+
+IF YOU GOT A PANEL ON 1.8 OR ABOVE VERSION :
+3 - In routes/api-client.php after "Route::get('/resources', Client\Servers\ResourceUtilizationController::class)->name('api:client:server.resources');
+" add :
+"
+    Route::get('/listefivem', [Client\Servers\FileController::class, 'listefivem']);
+"
+ELSE 
+3 - In routes/api-client.php after "Route::get('/resources', 'Servers\ResourceUtilizationController')->name('api:client:server.resources');" add :
+"
+    Route::get('/listefivem', 'Servers\FileController@listefivem');
+"
+
+4 - In app/Http/Controllers/Api/Client/Servers/FileController.php above the last }
+Add :
+"
+    /**
+     * Returns a listing of resources.
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function listefivem(ListResourcesRequest $request, Server $server): array
+    {
+        $contents = $this->fileRepository
+            ->setServer($server)
+            ->ListDirectoryFiveM($request->get('directory') ?? '/');
+        return $this->fractal->collection($contents)
+            ->transformWith($this->getTransformer(FivemResourcesTransformer::class))
+            ->toArray();
+    }
+
+"
+
+
+AND after "use Pterodactyl\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;" add :
+"
+use Pterodactyl\Http\Requests\Api\Client\Servers\Files\ListResourcesRequest;
+use Pterodactyl\Transformers\Api\Client\FivemResourcesTransformer;
+"
+
+FOR PANEL UNDER 1.9 VERSION:
+5 - In resources/scripts/routers/ServerRouter.tsx under all import line add :
+
+import FiveMResourcesContainer from '@/components/server/fivemresources/FiveMResourcesContainer';
+
+
+Under :
+
+"<Can action={'backup.*'}>
+    <NavLink to={`${match.url}/backups`}>Backups</NavLink>
+</Can>"
+
+add :
+                                {eggId === (YOUR FIVEM eggid) &&
+                                <Can action={'resourcesmananger.*'}>
+                                    <NavLink to={`${match.url}/FiveMResources`}>FiveM Resources</NavLink>
+                                </Can>
+                                }
+
+under "const clearServerState = ServerContext.useStoreActions(actions => actions.clearServerState);" add :
+
+    const eggId = ServerContext.useStoreState(state => state.server.data?.eggId);
+
+and under :
+
+"<Route path={`${match.path}/backups`} exact>
+    <RequireServerPermission permissions={'backup.*'}>
+        <BackupContainer/>
+    </RequireServerPermission>
+</Route>"
+
+add :
+
+                                    {eggId === (YOUR FIVEM eggid) &&
+                                   <Route path={`${match.path}/FiveMResources`} exact>
+                                       <RequireServerPermission permissions={'file.*'}>
+                                           <FiveMResourcesContainer/>
+                                       </RequireServerPermission>
+                                   </Route>
+                                    }
+
+FOR PANEL ABOVE 1.9 VERSION :
+
+5 - In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/FiveMResources',
+            permission: 'file.*',
+            name: 'Ressources',
+            eggId: YOUR EGG ID,
+            component: FiveMResourcesContainer,
+        },
+
+
+Dont forget to replace "YOUR EGG ID" by your FiveM Egg Id!
+
+5.1 - In same file after "permission: string | string[] | null;" add :
+
+                 nestId?: number[];
+                 eggId?: number[];
+                 nestIds?: number[];
+                 eggIds?: number[];
+
+5.2 - In same file after all import line add :
+
+import FiveMResourcesContainer from '@/components/server/fivemresources/FiveMResourcesContainer';
+
+
+5.2 - In resources/scripts/routers/ServerRouter.tsx add under  "    const clearServerState = ServerContext.useStoreActions((actions) => actions.clearServerState);"
+
+    const nestId = ServerContext.useStoreState(state => state.server.data?.nestId);
+    const eggid = ServerContext.useStoreState(state => state.server.data?.eggid);
+
+5.3 - In resources/scripts/routers/ServerRouter.tsx add under all import lines:
+
+import {Navigation, ComponentLoader} from '@/routers/ServerElements';
+
+
+5.4 - In samer file replace :
+
+"
+route.permission ? (
+                                            <Can key={route.path} action={route.permission} matchAny>
+                                                <NavLink to={to(route.path, true)} exact={route.exact}>
+                                                    {route.name}
+                                                </NavLink>
+                                            </Can>
+                                        ) : (
+                                            <NavLink key={route.path} to={to(route.path, true)} exact={route.exact}>
+                                                {route.name}
+                                            </NavLink>
+                                        )
+"
+
+
+By:
+
+                                       <Navigation/>
+
+5.5 - In same file replace :
+
+"
+                               {routes.server.map(({ path, permission, component: Component }) => (
+                                        <PermissionRoute key={path} permission={permission} path={to(path)} exact>
+                                            <Spinner.Suspense>
+                                                <Component />
+                                            </Spinner.Suspense>
+                                        </PermissionRoute>
+                                    ))}
+"
+
+By :
+
+                <ComponentLoader />
+
+
+
+7 - In app/Repositories/Wings/DaemonFileRepository.php above the last } add :
+"
+     /**
+     * Return a directory listing for a given path.
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function ListDirectoryFiveM(string $path): array
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+
+        try {
+            $response = $this->getHttpClient()->get(
+                sprintf('/api/servers/%s/files/list-resources-fivem', $this->server->uuid),
+                [
+                    'query' => ['directory' => "./"],
+                ]
+            );
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+
+        return json_decode($response->getBody(), true);
+    }
+"
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+
+FOR A URGENT HELP CONTACT ME DIRECTLY BY SMS OR EMAIL!!
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com

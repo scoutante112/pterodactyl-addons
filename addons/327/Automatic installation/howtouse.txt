@@ -1,0 +1,34 @@
+Hey Bagou450 Thanks for your purchase
+
+The autoinstaller still in beta! 
+
+If you don't have yarn/nodejs install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+apt -y install nodejs
+export NODE_PATH=$(npm root --quiet -g)
+cd /var/www/pterodactyl
+npm i -g yarn
+
+
+After you need to install required package
+
+yarn add readline-sync axios fs child_process html-react-parser@3.0.4 react-markdown@8.0.7 
+
+
+Now execute the script
+
+cd /var/www/pterodactyl && wget https://cdn.bagou450.com/autoinstaller.js && node autoinstaller.js
+
+After activate your addon trough bagou license tab in admin panel.
+You can find your LICENSE on your BuiltByBit conversation.
+
+
+FOR A URGENT SUPPORT PLEASE CONTACT ME DIRECTLY BY SMS OR EMAIL
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com
+
+
+

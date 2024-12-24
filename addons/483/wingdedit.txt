@@ -1,0 +1,107 @@
+Hey, thanks for your purchase.
+
+1 - run this command on your server :
+
+mkdir /srv/wings
+cd /srv/wings
+
+2 - after run a wget command with last wings version (you can get it here : https://github.com/pterodactyl/wings/releases), unzip it and go to wings folder. For exemle with the wings 1.5.5 :
+
+wget https://github.com/pterodactyl/wings/archive/refs/tags/v1.5.5.zip
+unzip v1.5.5.zip
+mv wings-1.5.5/* ./
+
+3 - In router/router.go under '			files.POST("/chmod", postServerChmodFile)':
+
+			files.POST("/getDownloadState", getDownloadState)
+			files.POST("/getFileSize", getFileSize)
+
+4 - In router/router_server_files.go at the end of file add :
+
+// For download file
+
+
+func getDownloadState(c *gin.Context) {
+    s := ExtractServer(c)
+	var data struct {
+		Path string `json:"path"`
+	}
+	if err := c.BindJSON(&data); err != nil {
+		log.Debug(err.Error())
+		return
+	}
+		p, err := s.Filesystem().DownloadState(data.Path); 
+		if err !=nil {
+			NewServerError(err, s).Abort(c)
+			return
+		}
+		c.JSON(http.StatusOK, p)
+
+}
+func getFileSize(c *gin.Context) {
+    s := ExtractServer(c)
+	var data struct {
+		Url string `json:"url"`
+	}
+	if err := c.BindJSON(&data); err != nil {
+		log.Debug(err.Error())
+		return
+	}
+		p, err := s.Filesystem().FileSize(data.Url); 
+		if err !=nil {
+			NewServerError(err, s).Abort(c)
+			return
+		}
+		c.JSON(http.StatusOK, p)
+
+}
+ 
+5 - server/filesystem/filesystem.go at the end of file add :
+
+// For download file
+
+func (fs *Filesystem) FileSize(url string) (int64, error) {
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	resp, err := httpClient.Head(url)
+
+	if err != nil {
+		return 0, err
+	}
+		return resp.ContentLength, nil
+
+}
+
+func (fs *Filesystem) DownloadState(p string) (int64, error) {
+	cleaned, err := fs.SafePath(p)
+	if err != nil {
+		return 0, err
+	}
+	file, err := os.Open( cleaned ) 
+	if err != nil {
+    	return 0, err
+	}
+	fi, err := file.Stat()
+	if err != nil {
+    	return 0, err
+	}
+	return fi.Size(), nil
+
+}
+
+And after all import line add
+'net/http'
+5 - Install go on your serve (https://golang.org/doc/install)
+
+6 - run go build (if return null its good)
+
+7 - run :
+
+rm /usr/local/bin/wings
+cp wings /usr/local/bin/wings
+chmod u+x /usr/local/bin/wings
+
+8 - Restart wings
+
+
+If you need help contact me on discord : Bagou450#0666  or Bagou450#2951
+or if not work Yotapaki#8953

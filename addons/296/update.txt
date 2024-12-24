@@ -1,0 +1,1 @@
+Upload content of panelfiles folder to your pterodactyl folder and do a yarn build:production

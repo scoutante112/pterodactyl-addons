@@ -1,0 +1,76 @@
+Hey, thanks for your purchase.
+
+First add the pterodactyl eslint configuration to your pterodactyl
+
+cd /var/www/pterodactyl
+
+After you need to upload the content of panelfiles/fr or panelfiles/en (It depends on the desired language) folder
+
+Now go to change the panel files
+
+
+1 - In resources/scripts/components/server/settings/SettingsContainer.tsx under all import line add : 
+
+import TxServerBox from '@/components/server/settings/TxServerBox';
+import getServerStartup from '@/api/swr/getServerStartup';
+
+
+After "const sftp = ServerContext.useStoreState((state) => state.server.data!.sftpDetails, isEqual);" add :
+
+    const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
+    const variables = ServerContext.useStoreState(({ server }) => ({
+        variables: server.data!.variables,
+        invocation: server.data!.invocation,
+        dockerImage: server.data!.dockerImage,
+    }), isEqual);
+    const { data, error, isValidating, mutate } = getServerStartup(uuid, {
+        ...variables,
+        dockerImages: { [variables.dockerImage]: variables.dockerImage },
+    });
+
+Replace
+                    <Can action={'settings.reinstall'}>
+                            <ReinstallServerBox/>
+                    </Can>
+
+By: 
+
+                    <Can action={'settings.reinstall'}>
+                        <div css={tw`mb-6 md:mb-10`}>
+                            <ReinstallServerBox/>
+                        </div>
+                    </Can>
+                    {data?.variables.find((v) => v.envVariable === 'TXADMIN_ENABLE') &&
+                    <TxServerBox/>
+
+                    }
+
+
+For panel under 1.8.X version:
+
+In resources/scripts/components/server/settings/TxServerBox.tsx replace
+
+"        dockerImages: { [variables.dockerImage]: variables.dockerImage },"
+
+By
+
+"        dockerImages: { variables.dockerImage },"
+
+Go to your admin panel and in Settings >> Advanced change 'Automatic Allocation Creation' to enabled
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a sms to +33 7 56 89 00 36 (Unsurcharged number)

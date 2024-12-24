@@ -1,0 +1,173 @@
+Hey, thanks for your purchase.
+
+
+First you need to upload the content of panelfiles/ folder to your Pterodactyl folder (Usually /var/www/pterodactyl)
+
+Now go to change the panel files
+
+
+1 - In app/Models/Permission.php under
+
+       'file' => [
+            'description' => 'Permissions that control a user\'s ability to modify the filesystem for this server.',
+            'keys' => [
+                'create' => 'Allows a user to create additional files and folders via the Panel or direct upload.',
+                'read' => 'Allows a user to view the contents of a directory, but not view the contents of or download files.',
+                'read-content' => 'Allows a user to view the contents of a given file. This will also allow the user to download files.',
+                'update' => 'Allows a user to update the contents of an existing file or directory.',
+                'delete' => 'Allows a user to delete files or directories.',
+                'archive' => 'Allows a user to archive the contents of a directory as well as decompress existing archives on the system.',
+                'sftp' => 'Allows a user to connect to SFTP and manage server files using the other assigned file permissions.',
+            ],
+        ],
+
+add 
+
+FOR ENGLISH VERSION :
+
+        'serverimporter' => [
+            'description' => 'This part is about the Server Importer tab. ',
+            'keys' => [
+                'acces' => 'Allows the user to acces the Server Importer tab.',
+            ],
+        ],   
+
+2 - If you got a panel version above 1.8
+In routes/api-client.php after "Route::get('/upload', Client\Servers\FileUploadController::class);" add :
+"
+    Route::post('/importer', [Client\Servers\FileController::class, 'importer']);
+"
+Else:
+In routes/api-client.php after "Route::get('/upload', 'Servers\FileUploadController');" add :
+"
+    Route::post('/importer', 'Servers\FileController@importer');
+"
+3 - In app/Http/Controllers/Api/Client/Servers/FileController.php above the last }
+Add : 
+"
+     /**
+     * Import sftp server file to server
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function importer(ImporterRequest $request, Server $server): JsonResponse
+    {
+
+        $contents = $this->fileRepository
+        ->setServer($server)
+        ->importer($request->get('user'), $request->get('password'), $request->get('hote'), $request->get('port'));
+        return new JsonResponse([], Response::HTTP_NO_CONTENT);
+    }
+
+"
+
+
+AND after "use Pterodactyl\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;" add :
+"
+use Pterodactyl\Http\Requests\Api\Client\Servers\Files\ImporterRequest;
+use Illuminate\Support\Facades\Http;
+use Pterodactyl\Exceptions\DisplayException;
+"
+FOR PANEL UNDER 1.9 VERSION
+4 - In resources/scripts/routers/ServerRouter.tsx under all import line add :
+
+import ImporterContainer from '@/components/server/importer/ImporterContainer';
+
+
+Under :
+
+"<Can action={'backup.*'}>
+    <NavLink to={`${match.url}/backups`}>Backups</NavLink>
+</Can>"
+
+add : 
+                                <Can action={'serverimporter.*'}>
+                                    <NavLink to={`${match.url}/importer`}>Server Importer</NavLink>
+                                </Can>
+
+and under :
+
+"<Route path={`${match.path}/backups`} exact>
+    <RequireServerPermission permissions={'backup.*'}>
+        <BackupContainer/>
+    </RequireServerPermission>
+</Route>"
+
+add :
+                                    <Route path={`${match.path}/importer`} exact>
+                                        <RequireServerPermission permissions={'serverimporter.*'}>
+                                            <ImporterContainer/>
+                                        </RequireServerPermission>
+                                    </Route>
+
+FOR PANEL ABOVE 1.9 VERSION :
+
+In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/importer',
+            permission: 'serverimporter.*',
+            name: 'Server Importer",
+            component: ImporterContainer,
+        },
+        
+In same file under all import line add :
+
+import ImporterContainer from '@/components/server/importer/ImporterContainer';
+       
+5 - In app/Repositories/Wings/DaemonFileRepository.php above the last } add :
+"
+     /**
+     * Import sftp server file to server
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function importer(string $user, string $password, string $hote, int $port): ResponseInterface
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+        try {
+            return $this->getHttpClient()->post(
+                sprintf('/api/servers/%s/files/importer', $this->server->uuid),
+                [
+                    'json' => [
+                        'user' => $user,
+                        'password' => $password,
+                        'hote' => $hote,
+                        'port' => $port
+                    ],
+                ]
+            );
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+    }
+"
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+If you need help contact us : https://beta.bagou450.com/contact
+

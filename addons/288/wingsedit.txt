@@ -1,0 +1,230 @@
+Hey, thanks for your purchase.
+
+1 - run this command on your server :
+
+mkdir /tmp/wings
+cd /tmp/wings
+
+2 - after run a wget command with last wings version (you can get it here : https://github.com/pterodactyl/wings/releases), unzip it and go to wings folder. For exemle with the wings 1.11.7 :
+
+wget https://github.com/pterodactyl/wings/archive/refs/tags/v1.11.7.zip
+unzip v1.11.7.zip
+cd wings-1.11.7
+
+3 - run "nano router/router.go" and in file after "files.POST("/chmod", postServerChmodFile)" add :
+"
+           files.POST("/importer", serverImporter)
+"
+
+(presd f2->Y->enter for save and leave nano)
+
+4 - run "nano server/filesystem/filesystem.go" and at the end of file add : 
+"
+func (fs *Filesystem) ServerImporter(user string, password string, hote string, port int) error {
+    config := ssh.ClientConfig{
+        User: user,
+        Auth: []ssh.AuthMethod{
+            ssh.Password(password),
+        },
+
+        HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+    }
+    cleaned, err := fs.SafePath("/")
+    fmt.Println(cleaned)
+    if err != nil {
+        return err
+    }
+    addr := fmt.Sprintf("%s:%d", hote, port)
+    // Connect to server
+    conn, err := ssh.Dial("tcp", addr, &config)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Failed to connecto to [%s]: %v\n", addr, err)
+        return err
+    }
+    sc, err := sftp.NewClient(conn)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to start SFTP subsystem: %v\n", err)
+        return err
+    }
+
+    files, err := sc.ReadDir(".")
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to list remote dir: %v\n", err)
+        return err
+    }
+    for _, f := range files {
+        var name string
+
+        name = f.Name()
+
+        if f.IsDir() {
+            strRune := Runes(name)
+            reversed := strRune.ReverseString()
+            slashnumber := strings.Index(string(name), "/")
+            if string(reversed[slashnumber+1]) != "" {
+                os.MkdirAll(cleaned + "/" + name, 0777)
+            }
+            isdir(name+"/", sc, cleaned)
+        }
+        if !f.IsDir() {
+            downloadfilesfromsftpserver(name, sc, cleaned)
+        }
+    }
+    return nil
+
+}
+func isdir(dir string, sc *sftp.Client, cleaned string) {
+    files, err := sc.ReadDir(dir)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to list remote dir: %v\n", err)
+        return
+    }
+    for _, f := range files {
+        var name string
+
+        name = f.Name()
+
+        if f.IsDir() {
+            strRune := Runes(name)
+            reversed := strRune.ReverseString()
+            slashnumber := strings.Index(string(name), "/")
+            if string(reversed[slashnumber+1]) != "" {
+                os.MkdirAll(cleaned+dir+name, 0777)
+            }
+            isdir(dir+name+"/", sc, cleaned)
+        }
+        if !f.IsDir() {
+            afterlastslash := strings.Split(name, "/")
+            test := strings.Join(afterlastslash[len(afterlastslash)-1:], "")
+            slashnumber := strings.ReplaceAll(dir+name, test, "")
+            os.MkdirAll(cleaned+ "/" + slashnumber, 0777)
+            // Output each file name and size in bytes
+            // Note: SFTP To Go doesn't support O_RDWR mode
+            downloadfilesfromsftpserver(dir+name, sc, cleaned)
+        }
+
+    }
+}
+func (str Runes) ReverseString() (revStr Runes) {
+    l := len(str)
+    revStr = make(Runes, l)
+    for i := 0; i <= l/2; i++ {
+        revStr[i], revStr[l-1-i] = str[l-1-i], str[i]
+    }
+    return revStr
+}
+func downloadfilesfromsftpserver(name string, sc *sftp.Client, folder string) {
+
+    // Note: SFTP To Go doesn't support O_RDWR mode
+    srcFile, err := sc.OpenFile(name, (os.O_RDONLY))
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to open remote file: %v\n", err)
+        return
+    }
+    defer srcFile.Close()
+
+    dstFile, err := os.Create(folder + "/" + name)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to open local file: %v\n", err)
+        return
+    }
+    defer dstFile.Close()
+
+    bytes, err := io.Copy(dstFile, srcFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to download remote file: %v\n and %v", err, bytes)
+        return
+    }
+}
+func getHostKey(host string) ssh.PublicKey {
+    // parse OpenSSH known_hosts file
+    // ssh or use ssh-keyscan to get initial key
+    file, err := os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts"))
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Unable to read known_hosts file: %v\n", err)
+        os.Exit(1)
+    }
+    defer file.Close()
+
+    scanner := bufio.NewScanner(file)
+    var hostKey ssh.PublicKey
+    for scanner.Scan() {
+        fields := strings.Split(scanner.Text(), " ")
+        if len(fields) != 3 {
+            continue
+        }
+        if strings.Contains(fields[0], host) {
+            var err error
+            hostKey, _, _, _, err = ssh.ParseAuthorizedKey(scanner.Bytes())
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "Error parsing %q: %v\n", fields[2], err)
+                return nil
+            }
+            break
+        }
+    }
+
+    if hostKey == nil {
+        fmt.Fprintf(os.Stderr, "No hostkey found for %s", host)
+        return nil
+    }
+
+    return hostKey
+}
+"
+
+4 - IN same file after ""github.com/pterodactyl/wings/system""
+
+add :
+    "github.com/pkg/sftp"
+    "golang.org/x/crypto/ssh"
+    "fmt"
+
+5 - IN same file after "import(...)" line add:
+
+type Runes []rune
+
+
+(presd f2->Y->enter for save and leave nano)
+
+
+6 - in router/router_server_files.go at the end of file add 
+"
+func serverImporter(c *gin.Context) {
+    s := ExtractServer(c)
+    var data struct {
+
+    User string `json:"user"`
+    Password string `json:"password"`
+    Hote string `json:"hote"`
+    Port int `json:"port"`
+
+}
+        if err := s.Filesystem().TruncateRootDirectory(); err != nil {
+            middleware.CaptureAndAbort(c, err)
+            return
+        }
+    if err := c.BindJSON(&data); err != nil {
+        return
+    }
+    if err := s.Filesystem().ServerImporter(data.User, data.Password, data.Hote, data.Port); err != nil {
+        middleware.CaptureAndAbort(c, err)
+    } else {
+        return
+    }
+}
+"
+7 - Install go on your serve (https://golang.org/doc/install)
+
+8 - run go build (if return null its good)
+
+9 - run :
+
+rm /usr/local/bin/wings
+cp wings /usr/local/bin/wings
+chmod u+x /usr/local/bin/wings
+
+10 - Restart wings
+
+
+If you need help contact us: https://beta.bagou450.com/contact

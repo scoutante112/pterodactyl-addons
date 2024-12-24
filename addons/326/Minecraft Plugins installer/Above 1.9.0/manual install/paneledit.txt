@@ -1,0 +1,224 @@
+Hey Bagou450 Thanks for your purchase
+First upload content of panel files folder.
+
+
+1 - In resources/lang/en/activity.php above "'subuser' => [" add :
+
+        'plugin' => [
+            'install' => 'Installation of :name',
+            'uninstall' => 'Uninstallation of :name',
+        ],
+
+2.1 - In resources/scripts/routers/routes.ts after "import ServerActivityLogContainer from '@/components/server/ServerActivityLogContainer';" add :
+
+import McPluginsContainer from '@/components/server/mcplugins/McPluginsContainer';
+
+
+2.2 - In same file after "permission: string | string[] | null;" add :
+
+  nestId?: number;
+  eggId?: number;
+  nestIds?: number[];
+  eggIds?: number[];
+
+
+
+2.3 - In same file after :
+
+"
+    {
+      path: '/files',
+      permission: 'file.*',
+      name: 'Files',
+      component: FileManagerContainer,
+    },
+"
+
+
+Add :
+
+    {
+      path: '/plugins/Spigot/1/4',
+      permission: 'plugins.*',
+      name: 'Plugins Installer',
+      nestId: 1,
+      component: McPluginsContainer,
+    },
+    {
+      path: '/plugins/:name/:type/:category',
+      permission: 'plugins.*',
+      name: undefined,
+      nestId: 1,
+      component: McPluginsContainer,
+    },
+
+4.1 - In resources/scripts/routers/ServerRouter.tsx after "import ConflictStateRenderer from '@/components/server/ConflictStateRenderer';" add :
+
+import { Navigation, ComponentLoader } from '@/routers/ServerElement';
+
+4.2 - In same file replace :
+
+"
+                               {routes.server
+                                    .filter((route) => !!route.name)
+                                    .map((route) =>
+                                        route.permission ? (
+                                            <Can key={route.path} action={route.permission} matchAny>
+                                                <NavLink to={to(route.path, true)} exact={route.exact}>
+                                                    {route.name}
+                                                </NavLink>
+                                            </Can>
+                                        ) : (
+                                            <NavLink key={route.path} to={to(route.path, true)} exact={route.exact}>
+                                                {route.name}
+                                            </NavLink>
+                                        )
+                                    )}
+"
+
+
+By:
+
+                <Navigation />
+
+
+4.3 - In same file replace :
+
+"
+                               {routes.server.map(({ path, permission, component: Component }) => (
+                                        <PermissionRoute key={path} permission={permission} path={to(path)} exact>
+                                            <Spinner.Suspense>
+                                                <Component />
+                                            </Spinner.Suspense>
+                                        </PermissionRoute>
+                                    ))}
+"
+
+By :
+
+                <ComponentLoader />
+
+5.1 - In resources/scripts/api/server/getServer.ts under allocations: Allocation[]; add :
+
+	nestId: number;
+	eggId: number;
+
+5.2 - In same file after "allocations: ((data.relationships?.allocations as FractalResponseList | undefined)?.data || []).map(rawDataToServerAllocation)," add
+
+	nestId: data.nest_id,
+	eggId: data.egg_id,
+
+6 - In resources/views/layouts/admin.blade.php above "<li class="header">MANAGEMENT</li>" add :
+
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.bagoucenter') ?: 'active' }}">
+                            <a href="{{ route('admin.bagoucenter')}}">
+                                <i class="fa fa-globe"></i> <span>Bagou Center</span>
+                            </a>
+                        </li>
+
+7 -
+
+8.1 - In resources/scripts/components/elements/Pagination.tsx after "showGoToFirst?: boolean;" add :
+
+  customcss?: TwStyle;
+
+8.2 - In same file remplace "<div css={tw`mt-4 flex justify-center`}>" by :
+
+        <div css={customcss ? customcss : tw`mt-4 flex justify-center`}>
+
+8.3 - In same file replace "import tw from 'twin.macro';" by :
+
+import tw, { TwStyle } from 'twin.macro';
+
+8.4 - In same file replace "function Pagination<T>({ data: { items, pagination }, onPageSelect, children }: Props<T>) {" by:
+
+function Pagination<T>({ data: { items, pagination }, onPageSelect, customcss, children }: Props<T>) {
+
+
+
+9 - In app/Transformers/Api/Client/ServerTransformer.php under "'is_transferring' => !is_null($server->transfer)" add :
+
+'nest_id' => $server->nest_id,
+'egg_id' => $server->egg_id,
+
+10 - In app/Models/Permission.php above "// Controls permissions for editing or viewing a server's startup parameters." add :
+
+         'plugins' => [
+            'description' => 'This part is about the plugins tab (Minecraft only). ',
+            'keys' => [
+                'version' => 'Allows the user to install plugins through the plugins tab (Minecraft only).',
+            ],
+        ],
+
+11 - In routes/api-client.php above "Route::group(['prefix' => '/settings'], function () {" add :
+
+    Route::group(['prefix' => '/plugins'], function () {
+        Route::get('/', [Client\Servers\McPluginsController::class, 'plugins']);
+        Route::get('/getVersions', [Client\Servers\McPluginsController::class, 'getVersions']);
+        Route::get('/getMcVersions', [Client\Servers\McPluginsController::class, 'getMcVersions']);
+
+        Route::post('/install', [Client\Servers\McPluginsController::class, 'install']);
+        Route::post('/uninstall', [Client\Servers\McPluginsController::class, 'uninstall']);
+    });
+
+12 - In routes/admin.php at end of file add :
+
+/*
+|--------------------------------------------------------------------------
+| Bagou License Center Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/bagoucenter
+|
+*/
+Route::group(['prefix' => 'bagoucenter'], function () {
+    Route::get('/', [Admin\Bagou\BagouCenterController::class, 'index'])->name('admin.bagoucenter');
+    Route::get('/license/', [Admin\Bagou\BagouLicenseController::class, 'index'])->name('admin.bagoucenter.license');
+    Route::get('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'license'])->name('admin.bagoucenter.license.addon');
+
+    Route::get('/versions/', [Admin\Bagou\BagouVersionsController::class, 'index'])->name('admin.bagoucenter.versions');
+
+    Route::get('/settings', [Admin\Bagou\BagouSettingsController::class, 'index'])->name('admin.bagoucenter.settings');
+    Route::get('/settings/{addon}', [Admin\Bagou\BagouSettingsController::class, 'settings'])->name('admin.bagoucenter.settings.addon');
+
+    Route::get('/support/', [Admin\Bagou\BagouCenterController::class, 'settings'])->name('admin.bagoucenter.support');
+
+    Route::post('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'setlicense']);
+
+    Route::post('/versions', [Admin\Bagou\BagouVersionsController::class, 'refresh']);
+
+    Route::delete('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'removelicense']);
+
+});
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data * #or chown -R nginx:nginx * if you use last nginx version
+php artisan optimize && php artisan migrate --force
+
+
+After activate your addon trough bagou license tab in admin panel.
+YOUR LICENSE :
+FOR PTERODACTYLMARKET USERS : SELLER_DOWNLOADED
+
+For the moment the free installation service is suspended
+FOR A URGENT SUPPORT PLEASE CONTACT ME DIRECTLY BY SMS OR EMAIL
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com
+
+
+
+
+
+

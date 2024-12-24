@@ -1,0 +1,193 @@
+Hey, thanks for your purchase.
+
+First add the pterodactyl eslint configuration to your pterodactyl
+
+cd /var/www/pterodactyl
+wget https://raw.githubusercontent.com/pterodactyl/panel/develop/.eslintignore
+wget https://raw.githubusercontent.com/pterodactyl/panel/develop/.eslintrc.yml
+
+After you need to upload the content of panelfiles/fr or panelfiles/en (It depends on the desired language) folder
+
+Now go to change the panel files
+
+1 - In app/Repositories/Wings/DaemonPowerRepository.php above last } add :
+
+        /**
+     * This check if jar is valid
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function checkjar(string $jar): bool
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+
+        try {
+            $response = $this->getHttpClient()->get(
+                sprintf('/api/servers/%s/checkjar', $this->server->uuid),
+                [
+                    'json' => [
+                        'jar' => $jar,
+                    ],                ]
+            );
+
+
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+        return json_decode($response->getBody(), true)['status'];
+    }
+
+2 - In app/Http/Controllers/Api/Client/Servers/ServerController.php above last } add :
+
+    public function checkjar(Request $request, Server $server): bool
+    {
+        $contents = $this->powerRepository->setServer($server)->checkjar(
+            $request->get('jar'),
+        );
+
+        return $contents;
+    }
+
+3 - In same file after all use line add :
+
+use Pterodactyl\Transformers\Daemon\CheckJarTransformer;
+use Illuminate\Http\Request;
+use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
+
+4 - In same file add after "private GetUserPermissionsService $permissionsService" (on same line) :
+
+, private DaemonPowerRepository $powerRepository
+
+5 - If your panel version are on 1.8+
+ In routes/api-client.php under "Route::get('/resources', 'Servers\ResourceUtilizationController')->name('api:client:server.resources');" add :
+
+    Route::get('/checkjar', [Client\Servers\ServerController::class, 'checkjar'])->name('api:client:server.checkjar');
+
+Else :
+
+ In routes/api-client.php under "Route::get('/resources', 'Servers\ResourceUtilizationController')->name('api:client:server.resources');" add :
+
+    Route::get('/checkjar', 'Servers\ServerController@checkjar')->name('api:client:server.checkjar');
+
+6 - In resources/scripts/components/server/PowerControls.tsx under "const instance = ServerContext.useStoreState(state => state.socket.instance);" add :
+
+    const { addFlash, clearFlashes } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
+
+    const variables = ServerContext.useStoreState(({ server }) => ({
+        variables: server.data!.variables,
+        invocation: server.data!.invocation,
+        dockerImage: server.data!.dockerImage,
+    }), isEqual);
+    const uuid = ServerContext.useStoreState(state => state.server.data!.uuid);
+
+    const sendPowerCommand = (command: PowerAction) => {
+        clearFlashes('server:console');
+        if (command === 'start' || command === 'restart') {
+            console.log(variables.variables);
+            let mc = '';
+            for (const i of variables.variables) {
+                if (i.envVariable === 'SERVER_JARFILE') {
+                    mc = i.serverValue;
+                }
+            }
+            if (mc !== '') {
+                // Requst api for see if its a minecraft server or a bitcoin miner/other.
+                checkjar(uuid, mc).then((data) => {
+                    if (data) {
+                        console.log('Checked');
+                        instance && instance.send('set state', command);
+                    } else {
+
+                        addFlash({
+                            key: 'server:console',
+                            type: 'error',
+                            message: 'You have attempted to start the server with a un-supported jar file!',
+                        });
+                        setTimeout(() => {
+                            clearFlashes('server:console');
+                        }, 3000);
+                    }
+                });
+            } else {
+                instance && instance.send('set state', command);
+            }
+        } else {
+            instance && instance.send('set state', command);
+        }
+    };
+
+7 - In same file after all import line add :
+
+import checkjar from '@/api/server/checkjar';
+import { Actions, useStoreActions } from 'easy-peasy';
+import { ApplicationStore } from '@/state';
+import isEqual from 'react-fast-compare';
+
+8 - In same file remove :
+
+    const sendPowerCommand = (command: PowerAction) => {
+        instance && instance.send('set state', command);
+    };
+
+
+9 - In resources/scripts/components/server/ServerConsole.tsx under "<div css={tw`w-full lg:w-1/4`}>" add :
+
+                <FlashMessageRender byKey={'server:console'} css={tw`mb-2 mx-auto`} />
+
+10 - In same file after all import line add
+
+
+import FlashMessageRender from '../FlashMessageRender';
+
+11 - In app/Http/Controllers/Api/Client/Servers/PowerController.php after all use line add :
+
+use Pterodactyl\Transformers\Daemon\CheckJarTransformer;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+12 - In same file replace
+
+"
+        $this->repository->setServer($server)->send(
+            $request->input('signal')
+        );
+"
+
+By :
+
+if (DB::table('egg_variables')->where('egg_id', '=', $server->egg_id)->where('env_variable', '=', "SERVER_JARFILE")->get() != '[]'){
+        $eggvariable = DB::table('egg_variables')->where('egg_id', '=', $server->egg_id)->where('env_variable', '=', "SERVER_JARFILE")->pluck('id');
+        $jar == DB::table('server_variables')->where('server_id', '=', $server->id)->where('variable_id', '=', $eggvariable)->pluck('variable_value');
+        $contents = $this->repository->setServer($server)->checkjar(
+            $jar,
+        );
+        if($contents == true) {
+            $this->repository->setServer($server)->send(
+                $request->input('signal')
+            );
+        }
+    }
+        else {
+        $this->repository->setServer($server)->send(
+            $request->input('signal')
+        );
+    }
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+FOR A URGENT HELP CONTACT ME DIRECTLY BY SMS OR EMAIL!!
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com

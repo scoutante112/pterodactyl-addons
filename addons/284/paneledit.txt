@@ -1,0 +1,268 @@
+Hey, thanks for your purchase.
+
+First add the pterodactyl eslint configuration to your pterodactyl and upload all content of panelfiles folder to your pterodactyl folder
+
+cd /var/www/pterodactyl
+wget https://raw.githubusercontent.com/pterodactyl/panel/develop/.eslintignore
+wget https://raw.githubusercontent.com/pterodactyl/panel/develop/.eslintrc.yml
+
+In resources/scripts/api/transformers.ts after last "});" add :
+
+export const rawDataToServerBanIP = ({ attributes }: FractalResponseData): ServerBanIp => ({
+    uuid: attributes.serverid,
+    ip: attributes.ip,
+    country: attributes.country,
+    region: attributes.region,
+    city: attributes.city,
+    countryname: attributes.countryname,
+});
+
+In same file after ServerEggVariable (on same line) add : , ServerBanIp
+
+In resources/scripts/api/server/types.d.ts at the end of file add :
+
+export interface ServerBanIp {
+    uuid: string;
+    ip: string;
+    country: string | null;
+    region: string | null;
+    city: string | null;
+    countryname: string | null;
+} 
+
+In app/Http/Controllers/Api/Client/Servers/ServerController.php above last '}' add :
+
+     /**
+     * BanIP
+     *
+     * @throws \Spatie\Fractalistic\Exceptions\InvalidTransformation
+     * @throws \Spatie\Fractalistic\Exceptions\NoTransformerSpecified
+     * @throws \Throwable
+     */
+    public function banip(BanIpRequest $request, Server $server)
+    {
+            $this->daemonServerRepository->setServer($server)->banip($request->input('ip'), $request->input('port'));
+            $ip = $request->input('ip');
+            $json = file_get_contents("http://www.geoplugin.net/json.gp?ip=$ip");
+            $jsonobj = json_decode($json);
+            DB::table('BanIp')->insert([
+                'server_id' => $server->id,
+                'ip' => $request->input('ip'),
+                'country' => $jsonobj->geoplugin_countryCode,
+                'region' => $jsonobj->geoplugin_region,
+                'city' => $jsonobj->geoplugin_city,
+                'countryname' => $jsonobj->geoplugin_countryName,
+                'port' => $request->input('port'),
+            ]);
+            return $server->refresh();
+    }
+    public function unbanip(BanIpRequest $request, Server $server)
+    {
+            $this->daemonServerRepository->setServer($server)->unbanip($request->input('ip'), $request->input('port'));
+            DB::table('BanIp')->where('server_id', '=', $server->id)->where('ip', '=', $request->input('ip'))->where('port', '=', $request->input('port'))->delete();
+            return $server->refresh();
+    }
+    public function baniplist(Request $request, Server $server): array
+    {
+
+        $limit = min($request->query('per_page') ?? 10, 50);
+        return $this->fractal->collection($server->baniplist()->paginate($limit))
+            ->transformWith($this->getTransformer(BanIpTransformer::class))
+            ->toArray();
+    }
+
+In same file after all 'use' lines add :
+
+use Pterodactyl\Http\Requests\Api\Client\Servers\BanIpRequest;
+use Pterodactyl\Transformers\Api\Client\BanIpTransformer;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Pterodactyl\Exceptions\DisplayException;
+use Illuminate\Support\Facades\DB;
+use Pterodactyl\Repositories\Wings\DaemonServerRepository;
+
+In same file after SubuserRepository $repository (on same line) add :
+
+, DaemonServerRepository $daemonServerRepository
+
+In same file after '        $this->permissionsService = $permissionsService;' add :
+
+        $this->daemonServerRepository = $daemonServerRepository;
+
+In app/Models/Server.php aftter 'return $this->hasMany(Backup::class); (new line) }' add : 
+
+     /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function baniplist()
+    {
+        return $this->hasMany(Baniplist::class);
+    }
+
+If you are on 1.8+ panel version
+In routes/api-client.php after "Route::get('/resources', [Client\Servers\ResourceUtilizationController])->name('api:client:server.resources');" add :
+
+    Route::post('/banip', [Client\Servers\ServerController::class, 'banip']);
+    Route::post('/unbanip', [Client\Servers\ServerController::class, 'unbanip']);
+    Route::get('/baniplist', [Client\Servers\ServerController::class, 'baniplist']);
+Else
+In routes/api-client.php after "Route::get('/resources', 'Servers\ResourceUtilizationController')->name('api:client:server.resources');" add :
+
+    Route::post('/banip', 'Servers\ServerController@banip');
+    Route::post('/unbanip', 'Servers\ServerController@unbanip');
+    Route::get('/baniplist', 'Servers\ServerController@baniplist');
+
+In app/Repositories/Wings/DeamonServerRepository.php above the lase '}' add :
+
+   /**
+     * Ban ip.
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function banip(string $ip, string $port): void
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+
+        try {
+            $this->getHttpClient()->post(sprintf(
+                '/api/servers/%s/banip',
+                $this->server->uuid
+            ),
+            [
+                'json' => [
+                    'ip' => $ip,
+                    'port' => $port,
+                ],
+            ]);
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+    }   
+        /**
+     * UnBan ip.
+     *
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     */
+    public function unbanip(string $ip, string $port): void
+    {
+        Assert::isInstanceOf($this->server, Server::class);
+
+        try {
+            $this->getHttpClient()->post(sprintf(
+                '/api/servers/%s/unbanip',
+                $this->server->uuid
+            ),
+            [
+                'json' => [
+                    'ip' => $ip,
+                    'port' => $port,
+                ],
+            ]);
+        } catch (TransferException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+    }   
+
+FOR PANEL UNDER 1.9 VERSION
+In resources/scripts/routers/ServerRouter.tsx afer all import line add :
+
+import BanIpContainer from '@/components/server/banip/BanIpContainer';
+
+In same file after "<NavLink to={`${match.url}/backups`}>Backups</NavLink> (new line) </Can>" add :
+
+                                <Can action={'banip.*'}>
+                                    <NavLink to={`${match.url}/banip`}>BanIP</NavLink>
+                                </Can>
+
+In same file after "<BackupContainer/> (new line) </RequireServerPermission> (new line) </Route>" add :
+
+                                    <Route path={`${match.path}/banip`} exact>
+                                        <RequireServerPermission permissions={'banip.*'}>
+                                            <BanIpContainer/>
+                                        </RequireServerPermission>
+                                    </Route>
+                                    
+FOR PANEL ABOVE 1.9 VERSION :
+
+In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/banip',
+            permission: 'banip.*',
+            name: 'BanIP',
+            component: BanIpContainer,
+        },
+        
+In app/Services/Servers/ServerDeletationService above "$server->delete();" add :
+
+            $ipbanned = json_decode(DB::table('BanIp')->where('server_id', '=', $server->id)->get(), true);
+            foreach ($ipbanned as $ip) {
+                $this->daemonServerRepository->setServer($server)->unbanip($ip['ip'], $ip['port']);
+            }
+            \Illuminate\Support\Facades\DB::table('BanIp')->where('server_id', '=', $server->id)->delete();
+
+In same file after all use line add :
+
+use Illuminate\Support\Facades\DB;
+
+In same file ABOVE '$this->daemonServerRepository->setServer($server)->delete();' add :
+
+            $ipbans = json_decode(DB::table('BanIp')->where('server_id', '=', $server->id)->get(), true);
+
+            foreach($ipbans as $ipban) {
+                $this->daemonServerRepository->setServer($server)->unbanip($ipban['ip'], $ipban['port']);
+            };
+
+In app/Models/Permission.php after "'websocket' => [...]" add :
+
+        'banip' => [
+            'description' => 'Ban or unban ip.',
+            'keys' => [
+                'manage' => 'Ban or unban ip.',
+            ],
+        ],
+
+
+In resources/scripts/helpers.ts add at the end of file:
+
+export function bytesToHuman (bytes: number): string {
+    if (bytes === 0) {
+        return '0 kB';
+    }
+
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${Number((bytes / Math.pow(1024, i)).toFixed(2))} ${[ 'Bytes', 'kB', 'MB', 'GB', 'TB' ][i]}`;
+}
+
+
+
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a sms to +33 7 56 89 00 36 (Unsurcharged number)

@@ -1,0 +1,79 @@
+Hey, thanks for your purchase.
+
+1 - run this command on your server :
+
+mkdir /tmp/wings
+cd /tmp/wings
+
+2 - after run a wget command with last wings version (you can get it here : https://github.com/pterodactyl/wings/releases), unzip it and go to wings folder. For exemle with the wings 1.11.8 :
+
+wget https://github.com/pterodactyl/wings/archive/refs/tags/v1.11.8.zip
+unzip v1.11.8.zip
+cd wings-1.11.8
+
+3 - In router/router.go after "server.POST("/ws/deny", postServerDenyWSTokens)" add :
+
+		server.POST("/banip", postBanIp)
+		server.POST("/unbanip", postUnBanIp)
+
+4 - In router/router_server.go at the end of file add :
+
+func postBanIp(c *gin.Context) {
+	var data struct {
+		Ip   string `json:"ip"`
+		Port string `json:"port"`
+	}
+	if err := c.BindJSON(&data); err != nil {
+		return
+	}
+	cmd := exec.Command("iptables", "-A", "INPUT", "-p", "tcp", "-s", data.Ip, "--dport", data.Port, "-j", "DROP")
+	cmdd := exec.Command("iptables", "-A", "INPUT", "-p", "udp", "-s", data.Ip, "--dport", data.Port, "-j", "DROP")
+	err := cmd.Run()
+	if err != nil {
+		return
+	}
+	errr := cmdd.Run()
+	if errr != nil {
+		return
+	}
+
+}
+func postUnBanIp(c *gin.Context) {
+	var data struct {
+		Ip   string `json:"ip"`
+		Port string `json:"port"`
+	}
+	if err := c.BindJSON(&data); err != nil {
+		return
+	}
+	cmd := exec.Command("iptables", "-D", "INPUT", "-p", "tcp", "-s", data.Ip, "--dport", data.Port, "-j", "DROP")
+	cmdd := exec.Command("iptables", "-D", "INPUT", "-p", "udp", "-s", data.Ip, "--dport", data.Port, "-j", "DROP")
+	err := cmd.Run()
+	if err != nil {
+		return
+	}
+	errr := cmdd.Run()
+	if errr != nil {
+		return
+	}
+
+}
+
+In same file after all import line add :
+	"os/exec"
+	
+5 - Install go on your server (https://golang.org/doc/install)
+
+6 - run go build (if return null its good)
+
+7 - run :
+
+rm /usr/local/bin/wings
+cp wings /usr/local/bin/wings
+chmod u+x /usr/local/bin/wings
+
+8 - Restart wings
+
+
+If you need help contact me on discord : Bagou450#0666  or Bagou450#2951
+or if not work Yotapaki#8953

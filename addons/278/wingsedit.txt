@@ -1,0 +1,144 @@
+Hey, thanks for your purchase.
+
+1 - run this command on your server :
+
+mkdir /tmp/wings
+cd /tmp/wings
+
+2 - after run a wget command with last wings version (you can get it here : https://github.com/pterodactyl/wings/releases), unzip it and go to wings folder. For exemle with the wings 1.11.0 :
+
+wget https://github.com/pterodactyl/wings/archive/refs/tags/v1.11.0.zip
+unzip v1.11.0.zip
+cd wings-1.11.0
+
+3 - run "nano router/router.go" and in file after "files.GET("/list-directory", getServerListDirectory)" add :
+
+           files.GET("/list-resources-fivem", getServerFiveMResources)
+
+
+(presd f2->Y->enter for save and leave nano)
+
+4 - run "nano server/filesystem/filesystem.go" and at the end of file add :
+"
+func (fs *Filesystem) ListDirectoryFiveM(p string) ([]resource, error) {
+    cleaned, err := fs.SafePath("resources/")
+    if err != nil {
+        return nil, err
+    }
+    list := make([]resource, 0, 10)
+    filepath.Walk(cleaned, func(path string, info os.FileInfo, e error) error {
+        if e != nil {
+            return e
+        }
+        var dirSize int64 = 0
+        dirSize += info.Size()
+        sizeMB := float64(dirSize) / 1024.0
+        lastupdateDay := info.ModTime().Day()
+        lastupdateMonth := info.ModTime().Month()
+        lastupdateMinute := info.ModTime().Minute()
+        lastupdateSecond := info.ModTime().Second()
+        lastupdateYears := info.ModTime().Year()
+
+        strRune := Runes(path)
+        reversed := strRune.ReverseString()
+        slashnumber := strings.Index(string(reversed), "/")
+        if path[len(path)-1:] != "]" && !strings.Contains(path, ".") && string(reversed[slashnumber+1]) == "]" {
+
+            list = append(list, resource{Name: info.Name(), Path: path, Size: sizeMB, LastUpdateDay: lastupdateDay, LastUpdateMonth: lastupdateMonth, LastUpdateMinute: lastupdateMinute, LastUpdateSecond: lastupdateSecond, LastUpdateYears: lastupdateYears})
+        }
+        return nil
+    })
+    return list, nil
+}
+"
+
+IN same file after
+"
+type Filesystem struct {
+    mu                sync.RWMutex
+    lastLookupTime    *usageLookupTime
+    lookupInProgress  *system.AtomicBool
+    diskUsed          int64
+    diskCheckInterval time.Duration
+    denylist          *ignore.GitIgnore
+
+    // The maximum amount of disk space (in bytes) that this Filesystem instance can use.
+    diskLimit int64
+
+    // The root data directory path for this Filesystem instance.
+    root string
+
+    isTest bool
+}
+"
+add :
+type Runes []rune
+type resource struct {
+    Name             string
+    Path             string
+    Size             float64
+    LastUpdateDay    int
+    LastUpdateMonth  time.Month
+    LastUpdateMinute int
+    LastUpdateSecond int
+    LastUpdateYears  int
+}
+
+func (str Runes) ReverseString() (revStr Runes) {
+    l := len(str)
+    revStr = make(Runes, l)
+    for i := 0; i <= l/2; i++ {
+        revStr[i], revStr[l-1-i] = str[l-1-i], str[i]
+    }
+    return revStr
+}
+
+func (str Runes) String() string {
+    return string(str)
+}
+
+(presd f2->Y->enter for save and leave nano)
+4- in router/router_server_files.go after
+"
+// Returns the contents of a directory for a server.
+func getServerListDirectory(c *gin.Context) {
+    s := ExtractServer(c)
+    dir := c.Query("directory")
+    if stats, err := s.Filesystem().ListDirectory(dir); err != nil {
+        middleware.CaptureAndAbort(c, err)
+    } else {
+        c.JSON(http.StatusOK, stats)
+    }
+}
+"
+add
+"
+
+// Returns the contents of a directory for a server.
+func getServerFiveMResources(c *gin.Context) {
+    s := ExtractServer(c)
+    dir := c.Query("directory")
+    if stats, err := s.Filesystem().ListDirectoryFiveM(dir); err != nil {
+        middleware.CaptureAndAbort(c, err)
+    } else {
+        c.JSON(http.StatusOK, stats)
+    }
+}
+"
+5 - Install go on your serve (https://golang.org/doc/install)
+
+6 - run go build (if return null its good)
+
+7 - run :
+
+service wings stop
+rm /usr/local/bin/wings
+cp wings /usr/local/bin/wings
+chmod u+x /usr/local/bin/wings
+service wings start
+
+
+FOR A URGENT HELP CONTACT ME DIRECTLY BY SMS OR EMAIL!!
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com

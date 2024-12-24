@@ -1,0 +1,46 @@
+In src/Pterodactyl/Views/config.twig after 
+"
+                            <div class="col-md-6 col-sm-12">
+                                {{ field('backups', item.backups, trans('pterodactyl.form.features.backups')  ~ ' (' ~ trans("optional") ~ ")") }}
+                            </div>
+"
+
+Add :
+
+                            <div class="col-md-6 col-sm-12">
+                                {{ field('splittedLimit', item.splittedLimit, trans('Split limit')  ~ ' (' ~ trans("optional") ~ ")") }}
+                            </div>
+
+
+In src/Pterodactyl/db/migrations/ create 20220613134187_add_split_to_pterodactyl_table.php file and put in :
+
+<?php
+
+use Phinx\Db\Adapter\MysqlAdapter;
+use Phinx\Migration\AbstractMigration;
+
+class AddSplitToPterodactylTable extends AbstractMigration
+{
+    public function change()
+    {
+        $this->table("pterodactyl_config")
+            ->addColumn("splittedLimit", 'integer', ['default' => 0])
+            ->save();
+    }
+}
+
+
+
+In srx/Pterodactyl/Datebase/PterodactylTable.php after " "startup", "db", "backups"," (on same line) add :
+
+, "splittedLimit"
+
+
+In src/Pterodactyl/Actions/PterodactylConfigAction.php after ""location_id", "db", "backups"," (on same line) add :
+
+ "splittedLimit",
+ 
+
+Disable and enable pterodactyl modules
+
+

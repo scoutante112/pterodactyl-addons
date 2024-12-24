@@ -1,0 +1,1 @@
+Upload pterodactylcloudadmin folder to modules/servers folder

@@ -1,0 +1,454 @@
+Hey, thanks for your purchase.
+WARNING : If you do something wrong during the instalation the addon can remove all server of panel istead of all splitted server. I am not responsible for that.
+
+If the instalation if to hard contact me on discord (see end of file). i can install the addon for you.
+
+
+Now go to change the panel files
+
+1 - In routes/api-client.php under :
+If you have a panel on 1.8+
+
+"
+    Route::group(['prefix' => '/settings'], function () {
+        Route::post('/rename', [Client\Servers\SettingsController::class, 'rename']);
+        Route::post('/reinstall', [Client\Servers\SettingsController::class, 'reinstall']);
+        Route::put('/docker-image', [Client\Servers\SettingsController::class, 'dockerImage']);
+    });
+"
+
+Add :
+
+     Route::group(['prefix' => '/splitted'], function () {
+        Route::get('/', [Client\Servers\SplittedController::class, 'index']);
+        Route::post('/split', [Client\Servers\SplittedController::class, 'split']);
+        Route::post('/splitremove', [Client\Servers\SplittedController::class, 'delete']);
+    });
+Else :
+
+"
+    Route::group(['prefix' => '/settings'], function () {
+        Route::post('/rename', 'Servers\SettingsController@rename');
+        Route::post('/reinstall', 'Servers\SettingsController@reinstall');
+        Route::put('/docker-image', 'Servers\SettingsController@dockerImage');
+    });
+"
+
+Add :
+
+     Route::group(['prefix' => '/splitted'], function () {
+        Route::get('/', 'Servers\SplittedController@index');
+        Route::post('/split', 'Servers\SplittedController@split');
+        Route::post('/splitremove', 'Servers\SplittedController@delete');
+    });
+
+2 - In app/Models/Permission.php under:
+
+"
+        'backup' => [
+            'description' => 'Permissions that control a user\'s ability to generate and manage server backups.',
+            'keys' => [
+                'create' => 'Allows a user to create new backups for this server.',
+                'read' => 'Allows a user to view all backups that exist for this server.',
+                'delete' => 'Allows a user to remove backups from the system.',
+                'download' => 'Allows a user to download a backup for the server. Danger: this allows a user to access all files for the server in the backup.',
+                'restore' => 'Allows a user to restore a backup for the server. Danger: this allows the user to delete all of the server files in the process.',
+            ],
+        ],
+"
+
+Add
+
+        'split' => [
+            'description' => 'Permissions that control a user\'s ability to generate and manage server split.',
+            'keys' => [
+                'create' => 'Allows a user to split the server.',
+                'read' => 'Allows a user to view all splitted that exist for this server.',
+                'delete' => 'Allows a user to remove splitted server.',
+            ],
+        ],
+3 - In app/Transformers/Api/Client/ServerTransformer.php after "'backups' => $server->backup_limit," add :
+
+                'splittedLimit' => $server->split_limit,
+
+4 - In resources/views/admin/servers/view/build.blade.php after
+
+"
+                                <div class="form-group col-xs-6">
+                                    <label for="backup_limit" class="control-label">Backup Limit</label>
+                                    <div>
+                                        <input type="text" name="backup_limit" class="form-control" value="{{ old('backup_limit', $server->backup_limit) }}"/>
+                                    </div>
+                                    <p class="text-muted small">The total number of backups that can be created for this server.</p>
+                                </div>
+"
+
+Add :
+
+                                <div class="form-group col-xs-6">
+                                    <label for="split_limit" class="control-label">Split Limit</label>
+                                    <div>
+                                        <input type="text" name="split_limit" class="form-control" value="{{ old('split_limit', $server->split_limit) }}"/>
+                                    </div>
+                                    <p class="text-muted small">The total number of split a user is allowed to create for this server.</p>
+                                </div>
+
+5 - In app/Http/Controllers/Admin/ServersController.php after "'oom_disabled'" (on same line see screen 1 for more information) add :
+
+ 'split_limit',
+
+6 - In app/Services/Servers/BuildModificationService.php after "'disk', 'allocation_id'" (on same line see screen 2 for more information) add :
+
+, 'split_limit'
+
+FOR PANEL UNDER 1.9 VERSION
+7 - In resources/scripts/routers/ServerRouter.tsx after all import line add :
+
+import SplitContainer from '@/components/server/split/SplitContainer';
+
+8 - In same file after
+
+"
+                                <Can action={'allocation.*'}>
+                                    <NavLink to={`${match.url}/network`}>Network</NavLink>
+                                </Can>
+"
+
+Add :
+
+                                <Can action={'split.read'}>
+                                    <NavLink to={`${match.url}/split`}>Split</NavLink>
+                                </Can>
+
+9 - In same file after
+
+"
+                                    <Route path={`${match.path}/network`} exact>
+                                        <RequireServerPermission permissions={'allocation.*'}>
+                                            <NetworkContainer/>
+                                        </RequireServerPermission>
+                                    </Route>
+"
+
+Add :
+
+                                    <Route path={`${match.path}/split`} exact>
+                                        <RequireServerPermission permissions={'split.read'}>
+                                            <SplitContainer/>
+                                        </RequireServerPermission>
+                                    </Route>
+FOR PANEL ABOVE 1.9 VERSION:
+
+7 - In resources/scripts/routers/routes.ts after:
+
+"
+        {
+            path: '/files',
+            permission: 'file.*',
+            name: 'Files',
+
+            component: FileManagerContainer,
+        },
+"
+
+Add:
+
+        {
+            path: '/split',
+            permission: 'split.read',
+            name: 'Split',
+            component: SplitContainer,
+        },
+In same file after all import line add :
+
+8 - import SplitContainer from '@/components/server/split/SplitContainer';
+
+FOR ALL PANEL VERSION:
+
+
+9 - In resources/scripts/api/server/getServer.ts after "featureLimits: {" add :
+
+        splittedLimit: number;
+
+In same file under 'node: string;' add :
+
+        eggName: string;
+
+10 - In same file after "node: data.node," add :
+
+    eggName: data.eggName,
+11 - In resources/scripts/components/elements/Field.tsx after "description?: string;" add :
+
+    cssstyle?: TwStyle;
+    splittedavailable?: string;
+
+12 - In same file "label, description, validate, " (on same line see screen 3 for more information) add :
+
+cssstyle, splittedavailable,
+
+13 - In same file after "({ field, form: { errors, touched } }: FieldProps) => (" add :
+
+                <div css={cssstyle}>
+
+14 - In same file after "{description}" (on same line see screen 4 for more information) add :
+
+<br/><div css={tw`text-white`}>{splittedavailable}</div>
+
+14 - In same file under
+
+"
+                        description ? <p className={'input-help'}>{description}<br/><div css={tw`text-white`}>{splittedavailable}</div></p> : null
+                    }
+"
+
+Add
+
+                </div>
+
+15 - In same file under all Import line add :
+
+import tw, { TwStyle } from 'twin.macro';
+
+
+16 - In app/Http/Controllers/Api/Client/Server/ServerController.php above "return $this->fractal->item($server)" add:
+
+
+        $eggname = DB::table('eggs')->where('id', '=', $server->egg_id)->pluck('name');
+        $eggname = ltrim($eggname, '["');
+        $eggname = substr($eggname, 0, -2);
+        $server['eggName'] = $eggname;
+
+17 - In same file after all import line add:
+
+use Pterodactyl\Exceptions\DisplayException;
+use Illuminate\Support\Facades\DB;
+
+18 - In app/Http/Requests/Api/Application/Servers/StoreServerRequest.php after "'backup_limit' => array_get($data, 'feature_limits.backups')," add :
+
+            'split_limit' => array_get($data, 'feature_limits.split_limit'),
+
+19 - In same file after "'feature_limits.backups' => $rules['backup_limit']," add :
+
+            'feature_limits.split_limit' => $rules['split_limit'],
+
+20 - In app/Models/Server.php after "'backup_limit' => 'present|nullable|integer|min:0'," add :
+
+        'split_limit' => 'present|nullable|integer|min:0',
+
+21 - In app/Services/Servers/ServerCreationService after "'backup_limit' => Arr::get($data, 'backup_limit') ?? 0," add:
+
+            'split_limit' => Arr::get($data, 'split_limit') ?? 0,
+
+22 - In app/Transformers/Api/Application/ServerTransformer.php after "'backups' => $server->backup_limit," add :
+
+                'split_limit' => $server->split_limit,
+
+23 - In resources/views/admin/servers/new.blade.php after
+
+"
+                                <div class="form-group col-xs-6">
+                                    <label for="backup_limit" class="control-label">Backup Limit</label>
+                                    <div>
+                                        <input type="text" name="backup_limit" class="form-control" value="{{ old('backup_limit', 0) }}"/>
+                                    </div>
+                                    <p class="text-muted small">The total number of backups that can be created for this server.</p>
+                                </div>
+"
+
+Add :
+
+                                <div class="form-group col-xs-6">
+                                    <label for="split_limit" class="control-label">Split Limit</label>
+                                    <div>
+                                        <input type="text" name="split_limit" class="form-control" value="{{ old('split_limit', 0) }}"/>
+                                    </div>
+                                    <p class="text-muted small">The total number of split a user is allowed to create for this server.</p>
+                                </div>
+
+24 - In app/Services/Servers/SuspensionService.php replace :
+
+"
+        $server->update([
+            'status' => $isSuspending ? Server::STATUS_SUSPENDED : null,
+        ]);
+"
+
+By :
+
+        $servers = [$server];
+        if ($server->split_masteruuid != '') {
+            $servers = Server::query()->where('split_masteruuid', $server->split_masteruuid)->get();
+        }
+        foreach($servers as $oneserver) {
+            $oneserver->update([
+                'status' => $isSuspending ? Server::STATUS_SUSPENDED : null,
+            ]);
+        }
+
+25 - In same file replace "$this->daemonServerRepository->setServer($server)->sync();" by:
+
+            foreach($servers as $oneserver) {
+                $this->daemonServerRepository->setServer($oneserver)->sync();
+            }
+
+26 - In same file replace
+
+"
+            $server->update([
+                'status' => $isSuspending ? null : Server::STATUS_SUSPENDED,
+            ]);
+"
+
+by
+
+            foreach($servers as $oneserver) {
+                $oneserver->update([
+                    'status' => $isSuspending ? Server::STATUS_SUSPENDED : null,
+                ]);
+            }
+
+ 27 - In app/Services/Servers/ServerDeletationService.php replace "$this->daemonServerRepository->setServer($server)->delete();" by:
+
+            foreach($servers as $oneserver) {
+                $this->daemonServerRepository->setServer($oneserver)->delete();
+            }
+
+28 - In same file under
+
+"
+    public function handle(Server $server)
+    {
+"
+
+Add :
+
+        $servers = [$server];
+        if ($server->split_masteruuid != '') {
+            $servers = Server::query()->where('split_masteruuid', $server->split_masteruuid)->get();
+
+        }
+
+29 - In same file replace :
+
+"
+        $this->connection->transaction(function () use ($server) {
+            foreach ($server->databases as $database) {
+                try {
+                    $this->databaseManagementService->delete($database);
+                } catch (Exception $exception) {
+                    if (!$this->force) {
+                        throw $exception;
+                    }
+
+                    // Oh well, just try to delete the database entry we have from the database
+                    // so that the server itself can be deleted. This will leave it dangling on
+                    // the host instance, but we couldn't delete it anyways so not sure how we would
+                    // handle this better anyways.
+                    //
+                    // @see https://github.com/pterodactyl/panel/issues/2085
+                    $database->delete();
+
+                    Log::warning($exception);
+                }
+            }
+
+            $server->delete();
+        });
+"
+
+By :
+
+        foreach($servers as $oneserver) {
+            $this->connection->transaction(function () use ($oneserver) {
+                foreach ($oneserver->databases as $database) {
+                    try {
+                        $this->databaseManagementService->delete($database);
+                    } catch (Exception $exception) {
+                        if (!$this->force) {
+                            throw $exception;
+                        }
+
+                        // Oh well, just try to delete the database entry we have from the database
+                        // so that the server itself can be deleted. This will leave it dangling on
+                        // the host instance, but we couldn't delete it anyways so not sure how we would
+                        // handle this better anyways.
+                        //
+                        // @see https://github.com/pterodactyl/panel/issues/2085
+                        $database->delete();
+
+                        Log::warning($exception);
+                    }
+                }
+
+                $oneserver->delete();
+            });
+        }
+30 - In same file above last } add :
+
+    public function handlesplitted(Server $server)
+    {
+        try {
+            $this->daemonServerRepository->setServer($server)->delete();
+        } catch (DaemonConnectionException $exception) {
+            // If there is an error not caused a 404 error and this isn't a forced delete,
+            // go ahead and bail out. We specifically ignore a 404 since that can be assumed
+            // to be a safe error, meaning the server doesn't exist at all on Wings so there
+            // is no reason we need to bail out from that.
+            if (!$this->force && $exception->getStatusCode() !== Response::HTTP_NOT_FOUND) {
+                throw $exception;
+            }
+
+            Log::warning($exception);
+        }
+
+        $this->connection->transaction(function () use ($server) {
+            foreach ($server->databases as $database) {
+                try {
+                    $this->databaseManagementService->delete($database);
+                } catch (Exception $exception) {
+                    if (!$this->force) {
+                        throw $exception;
+                    }
+
+                    // Oh well, just try to delete the database entry we have from the database
+                    // so that the server itself can be deleted. This will leave it dangling on
+                    // the host instance, but we couldn't delete it anyways so not sure how we would
+                    // handle this better anyways.
+                    //
+                    // @see https://github.com/pterodactyl/panel/issues/2085
+                    $database->delete();
+
+                    Log::warning($exception);
+                }
+            }
+
+            $server->delete();
+        });
+    }
+FOR 1.8 PANEL VERSION AND ABOVE:
+31 - In resources/scripts/helpers.ts after "export const megabytesToBytes = (mb: number) => Math.floor(mb * 1024 * 1024);" add:
+
+export const bytesToMegabytes = (bytes: number) => Math.floor(bytes / 1024 / 1024);
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+php routes:clear
+php artisan migrate
+chown -R www-data:www-data *
+
+
+FOR A URGENT HELP CONTACT ME DIRECTLY BY SMS OR EMAIL!!
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.gg/bagou450)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com
+

@@ -1,0 +1,1 @@
+Upload content of panelfiles folder to your Pterodactyl Folder and run "yarn build:production && php artisan migrate --force"

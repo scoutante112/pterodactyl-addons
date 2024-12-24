@@ -1,0 +1,83 @@
+1 - In resources/scripts/components/server/databases/DatabaseRow.tsx after "    const removeDatabase = ServerContext.useStoreActions(actions => actions.databases.removeDatabase);" add
+    
+    const eggId = ServerContext.useStoreState(state => state.server.data?.eggid);
+    const [ loading, setLoading ] = useState(false);
+    const { addFlash } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
+    const addtocfg = () => {
+        setLoading(true);
+        getFileContents(uuid, 'server.cfg')
+            .then(data => {
+                const servercfgfile = data.replace(/^set mysql_connection_string.*$/gm, '');
+                console.log('SET: ' + servercfgfile);
+                const newcontent = servercfgfile + '\nset mysql_connection_string "server=' + database.connectionString + ';database=' + database.name + ';userid=' + database.username + ';password=' + database.password + '"';
+                saveFileContents(uuid, 'server.cfg', newcontent);
+                setLoading(false);
+                addFlash({
+                    key: 'databases',
+                    type: 'success',
+                    message: 'Ligne mysql connection inserer dans le server.cfg avec succes!',
+                });
+            })
+            .catch(error => {
+                console.error(error);
+                setVisible(false);
+            });
+    };
+
+After <div css={tw`ml-8`}> add
+
+                    {eggId === Your Fivem egg id &&
+                    <Can action={'database.view_password'}>
+                        <Button css={tw`mr-2`} isSecondary onClick={() => addtocfg()}>
+                            <FontAwesomeIcon icon={faBookOpen} fixedWidth/>
+                        </Button>
+                    </Can>
+                    }
+
+
+(Replace Your fivem egg id by your fivem egg id)
+
+And after all import line add
+
+import saveFileContents from '@/api/server/files/saveFileContents';
+import getFileContents from '@/api/server/files/getFileContents';
+import { Actions, useStoreActions } from 'easy-peasy';
+import { ApplicationStore } from '@/state';
+
+In same file replace:
+
+import { faDatabase, faEye, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+
+by :
+
+import { faBookOpen, faDatabase, faEye, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+
+2 - In /app/Transformers/Api/Client/ServerTransformer.php bellow "'node' => $server->node->name," add :
+
+            'egg_id' => $server->egg_id,
+
+3 - In resources/scripts/api/server/getServer.ts under  "node: string;" add : 
+
+    eggid: number;
+
+and under "node: data.node," add :
+
+    eggid: data.egg_id,
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a sms to +33 7 56 89 00 36 (Unsurcharged number)

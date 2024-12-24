@@ -1,0 +1,5 @@
+Follow step 11 and 12 of paneledit
+Upload panel files
+
+Do
+yarn build:production && php artisan optimize && php artisan migrate

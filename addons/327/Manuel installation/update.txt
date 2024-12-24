@@ -1,0 +1,1 @@
+For update upload the content of panelfiles folder to /var/www/pterodactyl and do a yarn build:production

@@ -1,0 +1,141 @@
+Hey thanks for your purchase
+
+
+1 - In resources/views/admin/nodes/index.blade.php replace
+
+                                <td class="text-center">{{ $node->servers_count }}</td>
+
+by 
+
+                                <td class="text-center">{{ $node->servers_count }}/{{ $node->servers_limit }}</td>
+
+2 - resources/views/admin/nodes/view/settings.blade.php ABOVE 
+
+</div>
+                        <p class="text-muted small">Enter the total amount of disk space available on this node for server allocation. You may also provide a percentage that will determine the amount of disk space over the set limit to allow.</p>
+
+add :
+
+                            <div class="form-group col-md-6">
+                                <label for="servers_limit" class="control-label"><span class="label label-warning"></span> Servers Limit</label>
+                                <div>
+                                    <input type="text" name="servers_limit" class="form-control" value="{{ old('servers_limit', $node->servers_limit) }}"/>
+                                </div>
+                            </div>
+
+3 - In app/Models/Node.php under 'disk' => 'required|numeric|min:1', :
+
+        'servers_limit' => 'numeric|min:1',
+
+4 - In same file after "'disk' => 'integer'," add :
+
+        'servers_limit' => 'integer',
+
+5 - In app/Services/Servers/ServerCreationService.php under all use line add
+
+use Pterodactyl\Models\Node;
+use Spatie\QueryBuilder\QueryBuilder;
+
+6 - In same file replace
+
+
+        $eggVariableData = $this->validatorService
+            ->setUserLevel(User::USER_LEVEL_ADMIN)
+            ->handle(Arr::get($data, 'egg_id'), Arr::get($data, 'environment', []));
+
+        // Due to the design of the Daemon, we need to persist this server to the disk
+        // before we can actually create it on the Daemon.
+        //
+        // If that connection fails out we will attempt to perform a cleanup by just
+        // deleting the server itself from the system.
+        /** @var \Pterodactyl\Models\Server $server */
+        $server = $this->connection->transaction(function () use ($data, $eggVariableData) {
+            // Create the server and assign any additional allocations to it.
+            $server = $this->createModel($data);
+
+            $this->storeAssignedAllocations($server, $data);
+            $this->storeEggVariables($server, $eggVariableData);
+
+            return $server;
+        }, 5);
+
+        try {
+            $this->daemonServerRepository->setServer($server)->create(
+                Arr::get($data, 'start_on_completion', false) ?? false
+            );
+        } catch (DaemonConnectionException $exception) {
+            $this->serverDeletionService->withForce()->handle($server);
+
+            throw $exception;
+        }
+
+        return $server;
+
+by :
+
+        $nodes = QueryBuilder::for(
+            Node::query()->with('location')->withCount('servers')
+        )
+            ->allowedFilters(['uuid', 'name'])
+            ->allowedSorts(['id'])
+            ->paginate(25);
+        foreach($nodes as $node) {
+            if($node['id'] == $data['node_id']) {
+                if($node['servers_limit'] <= $node['servers_count']) {
+                    Assert::false(empty($data['servers_limit']), 'Too much server on this node.');
+                } else {
+                    $eggVariableData = $this->validatorService
+                    ->setUserLevel(User::USER_LEVEL_ADMIN)
+                    ->handle(Arr::get($data, 'egg_id'), Arr::get($data, 'environment', []));
+        
+                // Due to the design of the Daemon, we need to persist this server to the disk
+                // before we can actually create it on the Daemon.
+                //
+                // If that connection fails out we will attempt to perform a cleanup by just
+                // deleting the server itself from the system.
+                /** @var \Pterodactyl\Models\Server $server */
+                $server = $this->connection->transaction(function () use ($data, $eggVariableData) {
+                    // Create the server and assign any additional allocations to it.
+                    $server = $this->createModel($data);
+        
+                    $this->storeAssignedAllocations($server, $data);
+                    $this->storeEggVariables($server, $eggVariableData);
+        
+                    return $server;
+                }, 5);
+        
+                try {
+                    $this->daemonServerRepository->setServer($server)->create(
+                        Arr::get($data, 'start_on_completion', false) ?? false
+                    );
+                } catch (DaemonConnectionException $exception) {
+                    $this->serverDeletionService->withForce()->handle($server);
+        
+                    throw $exception;
+                }
+        
+                return $server;
+                }
+            }
+        }
+        Assert::false(empty($data['node_id']), 'No Node');
+
+7 - Upload panelfiles folder
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+php artisan migrate
+chown -R www-data:www-data *
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a sms to +33 7 56 89 00 36 (Unsurcharged number)

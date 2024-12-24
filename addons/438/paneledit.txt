@@ -1,0 +1,29 @@
+1 - Upload panelfiles to your pterodactyl panel (/var/www/pterodactyl by default)
+
+2 - In resources/scripts/components/elements/ScreenBlock.tsx after "</p>" add:
+
+                {!useDeviceDetect() &&
+                    <iframe css={tw`mt-2 w-full`} style={{ height: '500px' }} src={'/pacman/index.html'}/>
+                }
+
+In same file after all import line add :
+
+import useDeviceDetect from './useDeviceDetect';
+
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+chown -R www-data:www-data *
+
+For any inquiries or questions, please refer to our Helpdesk at https://help.bagou450.com.
+Should you require further assistance, do not hesitate to reach out to us via our contact page at https://bagou450.com/contact.

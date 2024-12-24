@@ -1,0 +1,777 @@
+Hey thanks for your purchase!
+
+First warning: If you remove a user that got cloud servers, cloud servers are going to be removed.
+Second warning: After the installation you need to go in your nodes settings for set the cloud system to on. If off cloud servers can't be created on this node.
+Third warning: After the installation you need to setup available eggs for cloud users in Cloud Servers admin tab.
+Fourth warning: This addon can have small problem with some themes. If you have a problem with the addon with your theme contact me on discord i go to resolve that.
+
+First upload content of panelfiles folder to your pterodactyl folder.
+
+
+1 - In app/Http/Requests/Api/Application/Users/StoreUserRequest.php after "'root_admin'," add :
+
+            'cloud',
+            'cloud_database',
+            'cloud_allocation',
+            'cloud_backup',
+            'cloud_cpu',
+            'cloud_ram',
+            'cloud_disk',
+            'cloud_users',
+            'cloud_servers',
+            
+2.0 - In app/Http/Controllers/Admin/UserController.php after all use line add :
+
+use Pterodactyl\Services\Servers\ServerDeletionService;
+
+2.1 - In same file after "protected UserRepositoryInterface $repository," add :
+
+    protected ServerDeletionService $serverdeletionservice;
+
+2.2 - In same file above "$this->deletionService->handle($user);" add :
+
+        $userservers = $user->servers;
+        $clousservers = Server::where('cloud', 1)->where('cloud_owner', $user->uuid)->get();
+        foreach($userservers as $server) {
+            $this->serverdeletionservice->withForce(true)->handle($server);
+        }
+        foreach($clousservers as $server) {
+            $this->serverdeletionservice->withForce(true)->handle($server);
+        }
+        $cloudusers = User::where('subcloud', 1)->where('subcloud_owner', $user->id)->get();
+        foreach($cloudusers as $user) {
+            User::where('uuid', $user->uuid)->update(['subcloud' => 0]);
+        }
+        
+3.0 - In app/Models/Node.php after "'maintenance_mode' => 'boolean'," add :
+
+        'cloud' => 'boolean',
+
+3.1 - In same file after "'upload_size' => 'int|between:1,1024'," add :
+
+        'cloud' => 'boolean',
+
+3.2 - In same file after "'description', 'maintenance_mode'," add : 
+
+ 'cloud',
+
+
+4 - In app/Http/Controllers/Api/Client/ClientController.php replace :
+
+        } else {
+            $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+        }
+  
+by :
+
+     } elseif ($type === 'cloud') {
+            $builder = $builder->where('servers.cloud_owner', $user->uuid)->where('servers.cloud', true);
+        } else {
+            $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+        }
+
+
+5.0 - In app/Models/Objects/DeploymentObject.php above last } add :
+
+    public function getCloud(): bool
+    {
+        if($this->cloud) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setCloud(bool $cloud)
+    {
+        $this->cloud = $cloud;
+
+        return $this;
+    }
+    /**
+     * @return $this
+     */
+    public function setNode(int $node)
+    {
+        $this->node = $node;
+
+        return $this;
+    }
+
+    public function getNode(): int
+    {
+        return $this->node;
+    }
+
+5.1 - In same file after "private array $ports = [];" add :
+
+    private bool $cloud = false;
+    private int $node = -1;
+
+6 - In app/Services/Servers/ServerCreationService.php after "->setMemory(Arr::get($data, 'memory'))" add :
+
+            ->setCloud($deployment->getCloud())
+            ->setNode($deployment->getNode())
+
+7.0 - In app/Services/Deployment/FindViableNodesService.php after 
+
+    /**
+     * Set the amount of memory that this server will be using. As with disk space, nodes that
+     * do not have enough free memory will be filtered out.
+     *
+     * @return $this
+     */
+    public function setMemory(int $memory): self
+    {
+        $this->memory = $memory;
+
+        return $this;
+    }
+    
+Add :
+
+    /**Add cloud */
+
+    public function setCloud(bool $cloud): self 
+    {
+        $this->cloud = $cloud;
+        return $this;
+    }
+    public function setNode(int $node): self 
+    {
+        $this->node = $node;
+        return $this;
+    } 
+
+7.1 - In same file after "->where('nodes.public', 1);" add :
+
+        if($this->cloud) {
+            $query = $query->where('nodes.cloud', true);
+        }
+        if($this->node != -1) {
+            $query = $query->where('nodes.id', $this->node);
+        }
+
+7.2 - In same file after "protected ?int $memory = null;":
+
+    protected ?bool $cloud = false;
+    protected ?int $node = -1;
+
+8.0 - In app/Models/User.php after "'root_admin'," add :
+
+        'cloud',
+        'cloud_database',
+        'cloud_allocation',
+        'cloud_backup',
+        'cloud_cpu',
+        'cloud_ram',
+        'cloud_disk',
+        'cloud_users',
+        'cloud_servers',
+        'subcloud',
+        'subcloud_owner',
+        'suspended'
+
+8.1 - In same file after "'totp_secret' => null," add :
+
+        'cloud' => false,
+        'subcloud' => false,
+        'suspended' => false,
+        
+8.2 - In same file after "        'totp_secret' => 'nullable|string'," add :
+
+        'cloud' => 'boolean',
+        'cloud_database' => 'sometimes|nullable|numeric',
+        'cloud_allocation' => 'sometimes|nullable|numeric',
+        'cloud_backup' => 'sometimes|nullable|numeric',
+        'cloud_cpu' => 'sometimes|nullable|numeric',
+        'cloud_ram' => 'sometimes|nullable|numeric',
+        'cloud_disk' => 'sometimes|nullable|numeric',
+        'cloud_users' => 'sometimes|nullable|numeric',
+        'cloud_servers' => 'sometimes|nullable|numeric',
+        'subcloud' => 'sometimes|boolean',
+        'subcloud_owner' => 'sometimes|nullable|numeric',
+        'suspended' => 'boolean',
+
+8.3 - In same file replace "$builder->where('servers.owner_id', $this->id)->orWhere('subusers.user_id', $this->id);" by :
+
+                $builder->where('servers.owner_id', $this->id)->orWhere('subusers.user_id', $this->id)->orWhere('cloud_owner', $this->id)->where('cloud', true);
+
+
+9 - In resources/views/admin/users/view.blade.php above "<div class="col-xs-12">" add :
+
+    @if ($user->cloud)
+    <div class="col-xs-12">
+        <div class="box {{ $user->suspended ? 'box-success' : 'box-warning '}}">
+            <div class="box-header with-border">
+                <h3 class="box-title">{{ $user->suspended ? 'Unsuspend Cloud User' : 'Suspend Cloud User'}}</h3>
+            </div>
+            <div class="box-body">
+                <p class="no-margin">All servers of the users are going to be {{ $user->suspended ? 'unsuspended' : 'suspended'}} same for linked cloud servers.</p>
+            </div>
+            <div class="box-footer">
+                <form action="{{ route('admin.users.cloud.suspend', $user->id) }}" method="POST">
+                    {!! csrf_field() !!}
+                    {!! method_field('POST') !!}
+                    <input type="submit" class="btn btn-sm {{ $user->suspended ? 'btn-success' : 'btn-warning '}} pull-right" value="{{ $user->suspended ? 'Unsuspend Cloud User' : 'Suspend Cloud User'}}"  />
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
+    
+9.1 - In same file above "<h3 class="box-title">Password</h3>" add :
+
+                    <h3 class="box-title">Cloud (set 0 for unlimited)</h3>
+                </div>
+                <div class="box-body">
+                    <div class="form-group">
+                        <label for="cloud" class="control-label">Cloud user</label>
+                    
+                        <div>
+                            <select name="cloud" class="form-control">
+                                <option value="0">@lang('strings.no')</option>
+                                <option value="1" {{ $user->cloud ? 'selected="selected"' : '' }}>@lang('strings.yes')</option>
+                            </select>
+                            <p class="text-muted"><small>Setting this to 'Yes' gives a user cloud access.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_database" class="control-label">Databases</label>
+                        <div>
+                            <input type="text" name="cloud_database" class="form-control" value="{{ old('cloud_database', $user->cloud_database) }}"/>
+                            <p class="text-muted"><small>The number of database that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_allocation" class="control-label">Allocations</label>
+                        <div>
+                            <input type="text" name="cloud_allocation" class="form-control" value="{{ old('cloud_allocation', $user->cloud_allocation) }}"/>
+                            <p class="text-muted"><small>The number of allocations that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_backup" class="control-label">Backup</label>
+                        <div>
+                            <input type="text" name="cloud_backup" class="form-control" value="{{ old('cloud_backup', $user->cloud_backup) }}"/>
+                            <p class="text-muted"><small>The number of backups that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_cpu" class="control-label">Cpu</label>
+                        <div>
+                            <div class="input-group">
+                                <input type="text" name="cloud_cpu" class="form-control" value="{{ old('cloud_cpu', $user->cloud_cpu) }}"/>
+                                <span class="input-group-addon">%</span>
+                            </div>
+                            <p class="text-muted"><small>The cpu that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_ram" class="control-label">Ram</label>
+                        <div>
+                            <div class="input-group">
+                                <input type="text" name="cloud_ram" class="form-control" value="{{ old('cloud_ram', $user->cloud_ram) }}"/>
+                                <span class="input-group-addon">MB</span>
+                            </div>
+                            <p class="text-muted"><small>The ram that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-4 ">
+                        <label for="cloud_disk" class="control-label">Disk</label>
+                        <div>
+                            <div class="input-group">
+                                <input type="text" name="cloud_disk" class="form-control" value="{{ old('cloud_disk', $user->cloud_disk) }}"/>
+                                <span class="input-group-addon">MB</span>
+                            </div>
+                            <p class="text-muted"><small>The disk that user can allocate to their server.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-6 ">
+                        <label for="cloud_users" class="control-label">Users</label>
+                        <div>
+                            <input type="text" name="cloud_users" class="form-control" value="{{ old('cloud_users', $user->cloud_users) }}"/>
+                            <p class="text-muted"><small>The number of users that user can create.</small></p>
+                        </div>
+                    </div>
+                    <div class="form-group  col-xs-6 ">
+                        <label for="cloud_servers" class="control-label">Servers</label>
+                        <div>
+                            <input type="text" name="cloud_servers" class="form-control" value="{{ old('cloud_servers', $user->cloud_servers) }}"/>
+                            <p class="text-muted"><small>The number of servers that user can create.</small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="box">
+                <div class="box-header with-border">
+                
+10 - In resources/views/admin/nodes/index.blade.php replace "                                <td>{!! $node->maintenance_mode ? '<span class="label label-warning"><i class="fa fa-wrench"></i></span> ' : '' !!}<a href="{{ route('admin.nodes.view', $node->id) }}">{{ $node->name }}</a></td>
+" by
+
+                                <td>{!! $node->maintenance_mode ? '<span class="label label-warning"><i class="fa fa-wrench"></i></span> ' : '' !!} <a href="{{ route('admin.nodes.view', $node->id) }}">{{ $node->name }}</a> {!! $node->cloud ? '<i class="fa fa-cloud"></i> ' : '' !!} </td>
+
+11 -  In resources/views/admin/nodes/view/index.blade.php under
+
+"
+                    <div class="col-sm-12">
+                        <div class="info-box bg-blue">
+                            <span class="info-box-icon"><i class="ion ion-social-buffer-outline"></i></span>
+                            <div class="info-box-content" style="padding: 23px 10px 0;">
+                                <span class="info-box-text">Total Servers</span>
+                                <span class="info-box-number">{{ $node->servers_count }}</span>
+                            </div>
+                        </div>
+                    </div>
+"
+
+add :
+
+                    @if($node->cloud)
+                    <div class="col-sm-12">
+                        <div class="info-box bg-aqua">
+                            <span class="info-box-icon"><i class="fa fa-cloud"></i></span>
+                            <div class="info-box-content" style="padding: 23px 10px 0;">
+                                <span class="info-box-text">Cloud Servers</span>
+                                <span class="info-box-text">This node is used for cloud servers</span>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+                    
+12 - In resources/views/layouts/admin.blade.php above "<li class="header">MANAGEMENT</li>" add :
+
+                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.cloud') ?: 'active' }}">
+                            <a href="{{ route('admin.cloud.index')}}">
+                                <i class="fa fa-cloud"></i> <span>Cloud Servers</span>
+                            </a>
+                        </li>
+                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.bagoucenter') ?: 'active' }}">
+                            <a href="{{ route('admin.bagoucenter')}}">
+                                <i class="fa fa-globe"></i> <span>Bagou Center</span>
+                            </a>
+                        </li>
+                        
+13 - In resources/views/admin/nodes/view/settings.blade.php after 
+                        <p class="text-muted small">If the node is marked as 'Under Maintenance' users won't be able to access servers that are on this node.</p>
+                    </div>
+
+add :
+
+<div class="form-group col-xs-12">
+                        <label class="form-label"><span class="label label-warning"><i class="fa fa-cloud"></i></span> Cloud servers</label>
+                        <div>
+                            <div class="radio radio-success radio-inline">
+                                <input type="radio" id="pCloudFalse" value="0" name="cloud" {{ (old('cloud', $node->cloud) == false) ? 'checked' : '' }}>
+                                <label for="pCloudFalse"> Disabled</label>
+                            </div>
+                            <div class="radio radio-info radio-inline">
+                                <input type="radio" id="pCloudTrue" value="1" name="cloud" {{ (old('cloud', $node->cloud) == true) ? 'checked' : '' }}>
+                                <label for="pCloudTrue"> Enabled</label>
+                            </div>
+                        </div>
+                        <p class="text-muted small">If the node is marked as 'Cloud' server from cloud addons are going to be created on it (you can allow cloud to multiple nodes).</p>
+                    </div>
+                 
+14.0 - In resources/scripts/components/App.tsx after "import Spinner from '@/components/elements/Spinner';" add :
+
+import CloudRouter from '@/routers/CloudRouter';
+import CloudRoute from './elements/CloudRoute';
+
+14.1 - In same file after "created_at: string;" add :
+
+    cloud: boolean;
+    cloud_database: number;
+    cloud_allocation: number;
+    cloud_backup: number;
+    cloud_cpu: number;
+    cloud_ram: number;
+    cloud_disk: number;
+    cloud_users: number;
+    cloud_servers: number;
+    subcloud_owner: string;
+    subcloud: string;
+
+14.2 - In same file after "      updatedAt: new Date(PterodactylUser.updated_at)," add :
+
+      cloud: PterodactylUser.cloud,
+      cloud_database: PterodactylUser.cloud_database,
+      cloud_allocation: PterodactylUser.cloud_allocation,
+      cloud_backup: PterodactylUser.cloud_backup,
+      cloud_cpu: PterodactylUser.cloud_cpu,
+      cloud_ram: PterodactylUser.cloud_ram,
+      cloud_disk: PterodactylUser.cloud_disk,
+      cloud_users: PterodactylUser.cloud_users,
+      cloud_servers: PterodactylUser.cloud_servers,
+      subcloud: PterodactylUser.subcloud,
+      subcloud_owner: PterodactylUser.subcloud_owner,
+      
+14.3 - In same file above "<AuthenticatedRoute path={'/'}>" add :
+
+              <CloudRoute path={'/cloud'}>
+                <Spinner.Suspense>
+                  <CloudRouter />
+                </Spinner.Suspense>
+              </CloudRoute>
+              
+15.0 - In resources/scripts/components/NavigationBar.tsx after "import Avatar from '@/components/Avatar';" add :
+
+import useSWR from 'swr';
+import cloudName, { CloudName } from '@/api/cloud/cloudName';
+
+15.1 - In same file under "const [isLoggingOut, setIsLoggingOut] = useState(false);" add :
+
+  const cloud = useStoreState((state: ApplicationStore) => state.user.data!.cloud);
+  const uuid = useStoreState((state: ApplicationStore) => state.user.data!.uuid);
+  const subcloud = useStoreState((state: ApplicationStore) => state.user.data!.subcloud);
+  const subcloud_owner = useStoreState((state: ApplicationStore) => state.user.data?.subcloud_owner);
+  const { data, error } = useSWR<CloudName>(
+    ['/cloud/cloudname'],
+    () => cloudName(subcloud_owner ? subcloud_owner : cloud ? uuid : '', subcloud ? true : false),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+  React.useEffect(() => {
+    if (error) {
+      console.log(error);
+    }
+  }, [error]);
+  
+15.2 - In same file replace "<div className={'w-full bg-neutral-900 shadow-md overflow-x-auto'}>" by:
+
+    <>
+      {(subcloud || cloud) && !data ? (
+        <div css={tw`w-full`}>
+          <SpinnerOverlay visible={true} />
+        </div>
+      ) : (
+        <div className={'w-full bg-neutral-900 shadow-md overflow-x-auto'}>
+
+15.3 - In same file replace "<Link to={'/'}>(...)</Link>" by :
+
+              <Link
+                to={'/'}
+                className={
+                  'text-2xl font-header px-4 no-underline text-neutral-200 hover:text-neutral-100 transition-colors duration-150 flex'
+                }
+              >
+                {((subcloud || cloud) && data?.name !== '' && data?.name) || (data?.img && data?.img !== '') ? (
+                  <>
+                    <img src={data?.img} className='h-12 mr-2 my-auto' />
+                    <span className='my-auto flex'> {data?.name}</span>
+                  </>
+                ) : (
+                  name
+                )}
+              </Link>
+            
+16.4 - In same file above "<Tooltip placement={'bottom'} content={'Account Settings'}>" add :
+
+{cloud ? (
+                <Tooltip placement={'bottom'} content={'Cloud'}>
+                  <NavLink to={'/cloud/'}>
+                    <FontAwesomeIcon icon={faCloud} />
+                  </NavLink>
+                </Tooltip>
+              ) : null}
+
+17.5 - In same file under last </div> add :
+
+        )}
+        </>
+
+18.6 - In same file replace "import { faCogs, faLayerGroup, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';" by :
+
+import { faCloud, faCogs, faLayerGroup, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+
+
+19.0 - In resources/scripts/components/elements/PageContentBlock.tsx after "import FlashMessageRender from '@/components/FlashMessageRender';" add :
+
+import SpinnerOverlay from './SpinnerOverlay';
+import { ApplicationStore } from '@/state';
+import cloudName, { CloudName } from '@/api/cloud/cloudName';
+import useSWR from 'swr';
+import { useStoreState } from 'easy-peasy';
+
+20.1 - In same file above "return (" add :
+
+const cloud = useStoreState((state: ApplicationStore) => state.user.data!.cloud);
+  const uuid = useStoreState((state: ApplicationStore) => state.user.data!.uuid);
+  const subcloud = useStoreState((state: ApplicationStore) => state.user.data!.subcloud);
+  const subcloud_owner = useStoreState((state: ApplicationStore) => state.user.data?.subcloud_owner);
+  const { data } = useSWR<CloudName>(
+    ['/cloud/cloudname'],
+    () => cloudName(subcloud_owner ? subcloud_owner : cloud ? uuid : '', subcloud ? true : false),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+21.2 - In same file above "<>" add :
+
+      {(subcloud || cloud) && !data ? (
+        <div css={tw`w-full`}>
+          <SpinnerOverlay visible={true} />
+        </div>
+      ) : (
+
+22.3 - In same file replace "<ContentContainer css={tw`mb-4`}>(...)</ContentContainer>" by :
+
+          <ContentContainer css={tw`mb-4`}>
+            <p css={tw`text-center text-neutral-500 text-xs`}>
+              {(subcloud || cloud) && data?.footer !== '' && data?.footer ? (
+                <a
+                  rel={'noopener nofollow noreferrer'}
+                  href={data?.footerlink}
+                  target={'_blank'}
+                  css={tw`no-underline text-neutral-500 hover:text-neutral-300`}
+                >
+                  {data?.footer}
+                </a>
+              ) : (
+                <a
+                  rel={'noopener nofollow noreferrer'}
+                  href={'https://pterodactyl.io'}
+                  target={'_blank'}
+                  css={tw`no-underline text-neutral-500 hover:text-neutral-300`}
+                >
+                  Pterodactyl&reg;
+                </a>
+              )}
+              &nbsp;&copy; 2015 - {new Date().getFullYear()}
+            </p>
+          </ContentContainer>
+
+23.4 - In same file above "</CSSTransition>" add :
+
+      )}
+
+24 - In resources/scripts/state/user.ts after "updatedAt: Date;" add :
+
+  cloud: boolean;
+  cloud_database: number;
+  cloud_allocation: number;
+  cloud_backup: number;
+  cloud_cpu: number;
+  cloud_ram: number;
+  cloud_disk: number;
+  cloud_users: number;
+  cloud_servers: number;
+  subcloud_owner: string;
+  subcloud: string;
+
+
+25.0 - In routes/admin.php at the end of file add :
+
+/*
+|--------------------------------------------------------------------------
+| Cloud servers Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/cloud
+|
+*/
+Route::group(['prefix' => 'cloud'], function () {
+    Route::get('/', [Admin\Cloud\CloudController::class, 'index'])->name('admin.cloud.index');
+    Route::post('/savesettings', [Admin\Cloud\CloudController::class, 'savesettings'])->name('admin.cloud.savesettings');
+
+});
+/*
+|--------------------------------------------------------------------------
+| Bagou License Center Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/bagoucenter
+|
+*/
+Route::group(['prefix' => 'bagoucenter'], function () {
+    Route::get('/', [Admin\Bagou\BagouCenterController::class, 'index'])->name('admin.bagoucenter');
+    Route::get('/license/', [Admin\Bagou\BagouLicenseController::class, 'index'])->name('admin.bagoucenter.license');
+    Route::get('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'license'])->name('admin.bagoucenter.license.addon');
+    
+    Route::get('/versions/', [Admin\Bagou\BagouVersionsController::class, 'index'])->name('admin.bagoucenter.versions');
+
+    Route::get('/settings', [Admin\Bagou\BagouSettingsController::class, 'index'])->name('admin.bagoucenter.settings');
+    Route::get('/settings/{addon}', [Admin\Bagou\BagouSettingsController::class, 'settings'])->name('admin.bagoucenter.settings.addon');
+
+    Route::get('/support/', [Admin\Bagou\BagouCenterController::class, 'settings'])->name('admin.bagoucenter.support');
+
+    Route::post('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'setlicense']);
+    
+    Route::post('/versions', [Admin\Bagou\BagouVersionsController::class, 'refresh']);
+
+    Route::delete('/license/{addon}', [Admin\Bagou\BagouLicenseController::class, 'removelicense']);
+    
+});
+
+26.1 - In same file after "    Route::delete('/view/{user:id}', [Admin\UserController::class, 'delete']);" add :
+
+    Route::group(['prefix' => 'cloud'], function () {
+        Route::post('/view/{user:id}/suspend', [Admin\Cloud\UserController::class, 'suspend'])->name('admin.users.cloud.suspend');
+    });
+
+
+27 - In routes/api-application.php after "Route::post('/', [Application\Users\UserController::class, 'store']);" add :
+
+    Route::post('/{user:id}/suspend', [Application\Cloud\UserController::class, 'suspend']);
+    Route::delete('/{user:id}/terminate', [Application\Cloud\UserController::class, 'terminate']);
+    
+28 - In routes/api-client.php at the end of file add :
+
+Route::prefix('/cloud')->group(function () {
+
+    Route::get('/infos', [Client\Cloud\CloudController::class, 'infos']);
+    Route::get('/cloudname', [Client\Cloud\CloudController::class, 'cloudname']);
+    
+    Route::group(['prefix' => '/settings'], function () {
+        Route::post('/setcloudname', [Client\Cloud\CloudSettingsController::class, 'setcloudname']);
+    });
+    Route::group(['prefix' => '/users'], function () {
+        Route::get('/', [Client\Cloud\CloudUserController::class, 'index']);
+        Route::get('/search', [Client\Cloud\CloudUserController::class, 'search']);
+        Route::get('/setowner', [Client\Cloud\CloudUserController::class, 'setowner']);
+
+        Route::post('/create', [Client\Cloud\CloudUserController::class, 'create']);
+        Route::post('/edit', [Client\Cloud\CloudUserController::class, 'edit']);
+
+        Route::delete('/delete', [Client\Cloud\CloudUserController::class, 'delete']);
+
+
+    });
+    Route::group(['prefix' => '/servers'], function () {
+
+        Route::get('/search', [Client\Cloud\CloudServersController::class, 'search']);
+
+        Route::post('/create', [Client\Cloud\CloudServersController::class, 'create']);
+        Route::post('/edit', [Client\Cloud\CloudServersController::class, 'edit']);
+        Route::post('/suspend', [Client\Cloud\CloudServersController::class, 'suspend']);
+
+        Route::delete('/delete', [Client\Cloud\CloudServersController::class, 'delete']);
+
+    });
+});
+
+30 - In app/Transformers/Api/Client/UserTransformer.php after "'created_at' => $model->created_at->toIso8601String()," add :
+
+            'cloud' => $model->cloud,
+            'cloud_database' => $model->cloud_database,
+            'cloud_allocation' => $model->cloud_allocation,
+            'cloud_backup' => $model->cloud_backup,
+            'cloud_cpu' => $model->cloud_cpu,
+            'cloud_ram' => $model->cloud_ram,
+            'cloud_disk' => $model->cloud_disk,
+            'cloud_users' => $model->cloud_users,
+            'cloud_servers' => $model->cloud_servers,
+            'id' => $model->id,
+            'name_first' => $model->name_first,
+            'name_last' => $model->name_last
+
+31 - In app/Http/Requests/Admin/UserFormRequest.php after "'root_admin'," add :
+
+            'cloud',
+            'cloud_database',
+            'cloud_allocation',
+            'cloud_backup',
+            'cloud_cpu',
+            'cloud_ram',
+            'cloud_disk',
+            'cloud_users',
+            'cloud_servers',
+
+32.0 - In resources/scripts/api/server/getServer.ts after "node: string;" add :
+
+  eggId: number;
+  owner: string;
+  cloud: boolean;
+  cloud_owner: string;
+
+32.1 - In same file after "node: data.node," add :
+
+  eggId: data.egg_id,
+  cloud: data.cloud,
+  cloud_owner: data.cloud_owner,
+  owner: data.owner_email,
+
+33.0 - In app/Transformers/Api/Client/ServerTransformer.php after "'node' => $server->node->name," add :
+
+       'owner_email' => User::where('id', $server->owner_id)->firstOrFail()['email'],
+       'egg_id' => $server->egg_id,
+       'cloud' => $server->cloud,
+       'cloud_owner' => $server->cloud_owner,
+       
+33.1 - In same file under all use line add : "use Pterodactyl\Models\User;"    
+
+
+34 - In resources/views/admin/users/index.blade.php replace  "                                <td><a href="{{ route('admin.users.view', $user->id) }}">{{ $user->email }}</a> @if($user->root_admin)<i class="fa fa-star text-yellow"></i>@endif</td>" by :
+
+                                <td><a href="{{ route('admin.users.view', $user->id) }}">{{ $user->email }}</a> @if($user->root_admin)<i class="fa fa-star text-yellow"></i>@endif @if($user->cloud)<i class="fa fa-cloud text-white"></i>@endif</td>
+
+
+35.0 - In resources/scripts/components/server/users/UsersContainer.tsx after "const setSubusers = ServerContext.useStoreActions((actions) => actions.subusers.setSubusers);" add :
+
+  const cloudowner = ServerContext.useStoreState((state) => state.server!.data!.cloud_owner);
+
+35.1 - In same file replace "subusers.map((subuser) => <UserRow key={subuser.uuid} subuser={subuser} />)" by :
+
+        subusers.map((subuser) => {
+          if (cloudowner !== subuser.uuid) return <UserRow key={subuser.uuid} subuser={subuser} />;
+          else return <></>;
+        })
+
+36.0 - In resources/scripts/components/dashboard/ServerRow.tsx replace "import { faEthernet, faHdd, faMemory, faMicrochip, faServer } from '@fortawesome/free-solid-svg-icons';" by
+
+import { faEthernet, faHdd, faMemory, faMicrochip, faServer, faCloud } from '@fortawesome/free-solid-svg-icons';
+
+36.1 - In same file replace "{server.name}" by:
+
+{server.name} {server.cloud && <FontAwesomeIcon icon={faCloud} />}
+
+37 - In resources/views/admin/servers/index.blade.php replace "                                <td><a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a></td>" by :
+
+                                <td><a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a> @if($server->cloud)<i class="fa fa-cloud text-white"></i>@endif</td>
+
+38 - In resources/views/admin/locations/index.blade.php replace "                                <td><a href="{{ route('admin.locations.view', $location->id) }}">{{ $location->short }}</a></td>
+" by :
+
+                                <td><a href="{{ route('admin.locations.view', $location->id) }}">{{ $location->short }}</a> {!! $location->cloud ? '<i class="fa fa-cloud"></i> ' : '' !!} </td>
+
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+php artisan optimize
+chown -R www-data:www-data * #or chown -R nginx:nginx * if you use last nginx version
+
+Add database changement:
+
+php artisan migrate --force
+
+
+After activate your addon trough bagou license tab in admin panel.
+YOUR LICENSE :
+FOR BUILTBYBITS USER: CONTACT ME FOR MOMENT
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com
+
+
+
+
+                    
+                    
+                    

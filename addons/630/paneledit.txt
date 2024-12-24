@@ -1,0 +1,56 @@
+Hey thanks for your purchase!
+
+All step are in /var/www/pterodactyl folder
+
+1 - In resources/scripts/components/server/console/PowerButton.tsx under "import { Dialog } from '@/components/elements/dialog';" add :
+
+import deleteFiles from '@/api/server/files/deleteFiles';
+import getServerStartup from '@/api/swr/getServerStartup';
+import isEqual from 'react-fast-compare';
+
+1.1 - In same file under "const instance = ServerContext.useStoreState((state) => state.socket.instance);" add :
+
+
+  const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
+  const variables = ServerContext.useStoreState(
+    ({ server }) => ({
+      variables: server.data!.variables,
+      invocation: server.data!.invocation,
+      dockerImage: server.data!.dockerImage,
+    }),
+    isEqual
+  );
+  const { data } = getServerStartup(uuid, {
+    ...variables,
+    dockerImages: { [variables.dockerImage]: variables.dockerImage },
+  });
+  
+1.2 - In same file above "instance.send('set state', action === 'kill-confirmed' ? 'kill' : action);" add :
+
+      if (
+        (action === 'restart' || action === 'start') &&
+        data?.variables.find((v) => v.envVariable === 'TXADMIN_ENABLE')
+      ) {
+        deleteFiles(uuid, '/', ['cache']);
+      }
+
+If you don't have yarn install it :
+
+apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+apt -y install nodejs
+cd /var/www/pterodactyl
+npm i -g yarn
+yarn install
+
+And build the panel assets :
+
+yarn build:production
+php artisan optimize
+chown -R www-data:www-data * #or chown -R nginx:nginx * if you use last nginx version
+
+If you need help contact me on discord : http://discord.bagou450.com/ (or https://discord.com/invite/98MdvaS3Qj)
+You don't have discord ? Send me a SMS to +33 7 56 89 00 36 (Unsurcharged number, No call)
+You prefer emails? Send a email to contact@bagou450.com
+
+
