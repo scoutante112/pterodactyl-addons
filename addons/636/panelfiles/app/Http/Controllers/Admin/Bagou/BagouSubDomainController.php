@@ -16,14 +16,14 @@ class BagouSubDomainController
 {
     protected $alert;
 
-    protected $apiUrl = 'https://api.bagou450.com/';
+    protected $apiUrl = 'https://api-mc.labnat.se/';
     public function __construct(
         AlertsMessageBag $alert,
     ) {
         $this->alert = $alert;
     }
     public function getDomains() {
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
 
         $licenses = Bagoulicense::all();
 
@@ -31,7 +31,7 @@ class BagouSubDomainController
             'licenses' => $licenses, 'domains' => Domain::all()]);
     }
     public function getDomainEditForm(Domain $domain) {
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
         $license = Bagoulicense::where('addon', '=', 636)->firstOrFail()->license;
         $listType = Http::get($this->apiUrl . "api/client/pterodactyl/subdomains?id=$license")->json();
@@ -46,7 +46,7 @@ class BagouSubDomainController
     public function getDomainAddForm() {
         $license = Bagoulicense::where('addon', '=', 636)->firstOrFail()->license;
         $listType = Http::get($this->apiUrl . "api/client/pterodactyl/subdomains?id=$license")->json();
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
 
         if($listType['status'] === 'success') {
@@ -102,7 +102,7 @@ class BagouSubDomainController
             $data['displayType'] = $listType['data'][$data['type']]['title'];
 
             $domain->fill($data);
-            $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+            $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
             $licenses = Bagoulicense::all();
             $domain->save();
 
@@ -116,7 +116,7 @@ class BagouSubDomainController
 
     public function getRecordList() {
         $records = Record::paginate(25);
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
         return view('admin.bagoucenter.settings.subdomain.record.index', ['addonslist' => $addonslist,'licenses' => $licenses, 'domains' => Domain::all(), 'records' => $records]);
     }
@@ -124,14 +124,14 @@ class BagouSubDomainController
     public function getRecordForm() {
         $domains = Domain::all();
         $eggs = Egg::all();
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
         return view('admin.bagoucenter.settings.subdomain.record.new', ['addonslist' => $addonslist,'licenses' => $licenses,'domains' => $domains, 'eggs' => $eggs]);
     }
     public function editRecordForm(Record $record) {
         $domains = Domain::all();
         $eggs = Egg::all();
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
         return view('admin.bagoucenter.settings.subdomain.record.edit', ['record' => $record, 'addonslist' => $addonslist,'licenses' => $licenses,'domains' => $domains, 'eggs' => $eggs]);
     }
@@ -151,7 +151,7 @@ class BagouSubDomainController
         if ($invalidEggs !== count($request->egg_ids)) {
             return back()->withErrors("Invalid eggs provided !");
         }
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
 
         try {
@@ -188,7 +188,7 @@ class BagouSubDomainController
         if ($invalidEggs !== count($request->egg_ids)) {
             return back()->withErrors("Invalid eggs provided !");
         }
-        $addonslist = Http::get('https://api.bagou450.com/api/client/pterodactyl/addonsList')->json();
+        $addonslist = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/addonsList')->json();
         $licenses = Bagoulicense::all();
 
         try {

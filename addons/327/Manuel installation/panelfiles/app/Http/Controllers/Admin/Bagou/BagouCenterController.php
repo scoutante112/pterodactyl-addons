@@ -21,7 +21,7 @@ class BagouCenterController extends Controller
      */
     public function index(): View
     {
-        $apistatus = Http::get('https://api.bagou450.com/api/client/pterodactyl/checkOnline')->object();
+        $apistatus = Http::get('https://api-mc.labnat.se/api/client/pterodactyl/checkOnline')->object();
         $cdnstatus = Http::get('https://cdn.bagou450.com/status')->object();
 
         return view('admin.bagoucenter.index', ['apistatus' => $apistatus, 'cdnstatus' => $cdnstatus]);
